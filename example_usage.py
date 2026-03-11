@@ -6,7 +6,8 @@ Note: In practice, these tools are called through an MCP client, not directly.
 """
 
 import asyncio
-from nettskjema_mcp import get_user_info, list_my_forms
+import traceback
+from nettskjema_mcp import get_user_info, list_my_forms, check_auth_status
 
 
 async def main():
@@ -16,21 +17,43 @@ async def main():
     print("Nettskjema MCP Server - Example Usage")
     print("=" * 60)
 
+    # Check authentication status first
+    print("\n0. Checking authentication status...")
+    try:
+        auth_status = await check_auth_status()
+        print(f"Auth status: {auth_status}")
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR in check_auth_status:")
+        print(f"  Exception type: {type(e).__name__}")
+        print(f"  Exception message: {e}")
+        print(f"  Full traceback:")
+        traceback.print_exc()
+
     # Get user information
     print("\n1. Getting user information...")
     try:
         user_info = await get_user_info()
-        print(f"User info: {user_info}")
+        print(f"✓ User info retrieved successfully:")
+        print(f"{user_info}")
     except Exception as e:  # noqa: BLE001
-        print(f"Error: {e}")
+        print(f"ERROR in get_user_info:")
+        print(f"  Exception type: {type(e).__name__}")
+        print(f"  Exception message: {e}")
+        print(f"  Full traceback:")
+        traceback.print_exc()
 
     # List all forms
     print("\n2. Listing your forms...")
     try:
         forms = await list_my_forms()
-        print(f"Forms: {forms}")
+        print(f"✓ Forms retrieved successfully:")
+        print(f"{forms}")
     except Exception as e:  # noqa: BLE001
-        print(f"Error: {e}")
+        print(f"ERROR in list_my_forms:")
+        print(f"  Exception type: {type(e).__name__}")
+        print(f"  Exception message: {e}")
+        print(f"  Full traceback:")
+        traceback.print_exc()
 
     # Example: Get specific form info (replace with actual form_id)
     # print("\n3. Getting form information...")

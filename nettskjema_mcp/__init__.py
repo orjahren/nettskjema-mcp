@@ -43,8 +43,15 @@ __all__ = [
 mcp = FastMCP("nettskjema")
 
 # Base URLs
-BASE_URL = "https://nettskjema.no/api/v3"
-AUTH_URL = "https://authorization.nettskjema.no/oauth2/token"
+# BASE_URL = "https://nettskjema.no/api/v3"
+# BASE_URL = "http://localhost:8008/api/v3"  # Use local server for testing
+BASE_URL = "http://localhost:8008/api/v3"  # Use local server for testing
+# AUTH_URL = "https://authorization.nettskjema.no/oauth2/token"
+AUTH_URL = "https://nettskjema-authorization-dev.uio.no/oauth2/token"
+
+print(f"[NETTSKJEMA MCP] Configured with:")
+print(f"  API Base URL: {BASE_URL}")
+print(f"  Auth URL: {AUTH_URL}")
 
 # Token cache
 _token_cache: Optional[dict[str, Any]] = None
@@ -59,6 +66,7 @@ async def get_oauth_token() -> str:
 
     # Check if we have a valid cached token
     if _token_cache and datetime.now() < _token_cache["expires_at"]:
+        print(f"[DEBUG] Using cached token (expires at {_token_cache['expires_at']})")
         return _token_cache["access_token"]
 
     # Get credentials from environment
@@ -71,16 +79,25 @@ async def get_oauth_token() -> str:
             "Get your credentials from https://authorization.nettskjema.no/"
         )
 
+    print(f"[DEBUG] Requesting new OAuth token from: {AUTH_URL}")
+    print(f"[DEBUG] Client ID: {client_id}")
+
     # Request new token
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            AUTH_URL,
-            auth=(client_id, client_secret),
-            data={"grant_type": "client_credentials"},
-            timeout=30.0,
-        )
-        response.raise_for_status()
-        token_data = response.json()
+        try:
+            response = await client.post(
+                AUTH_URL,
+                auth=(client_id, client_secret),
+                data={"grant_type": "client_credentials"},
+                timeout=30.0,
+            )
+            print(f"[DEBUG] Auth response status: {response.status_code}")
+            response.raise_for_status()
+            token_data = response.json()
+            print(f"[DEBUG] Token received successfully")
+        except Exception as e:
+            print(f"[DEBUG] OAuth token request failed: {e}")
+            raise
 
     # Cache token (expires in 24h, we'll refresh after 23h to be safe)
     expires_in = token_data.get("expires_in", 86400)  # Default 24h
@@ -109,27 +126,41 @@ async def api_request(
 ) -> Any:
     """Make an authenticated request to the Nettskjema API."""
     headers = await get_auth_headers()
+    url = f"{BASE_URL}{endpoint}"
+
+    print(f"[DEBUG] API Request: {method} {url}")
+    if params:
+        print(f"[DEBUG]   Params: {params}")
+    if json_data:
+        print(f"[DEBUG]   JSON data: {json_data}")
 
     async with httpx.AsyncClient() as client:
         try:
             response = await client.request(
                 method=method,
-                url=f"{BASE_URL}{endpoint}",
+                url=url,
                 headers=headers,
                 params=params,
                 json=json_data,
                 timeout=30.0,
             )
+            print(f"[DEBUG] Response status: {response.status_code}")
+            print(f"[DEBUG] Response headers: {dict(response.headers)}")
             response.raise_for_status()
 
             # Handle different response types
             if response.headers.get("content-type", "").startswith("application/json"):
-                return response.json()
+                result = response.json()
+                print(f"[DEBUG] Response JSON (first 500 chars): {str(result)[:500]}")
+                return result
+            print(f"[DEBUG] Response text (first 500 chars): {response.text[:500]}")
             return response.text
         except httpx.HTTPStatusError as e:
             error_msg = f"HTTP {e.response.status_code}: {e.response.text}"
+            print(f"[DEBUG] HTTP Error: {error_msg}")
             raise Exception(error_msg) from e
         except Exception as e:
+            print(f"[DEBUG] Request Exception: {type(e).__name__}: {str(e)}")
             raise Exception(f"API request failed: {str(e)}") from e
 
 

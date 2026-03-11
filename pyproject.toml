@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
+    { name = "Oliver Ruste Jahren", email = "oliverrj@uio.no" }
     { name = "Claude Sonnet 4.5", email = "noreply@anthropic.com" }
 ]
 keywords = ["mcp", "nettskjema", "uio", "forms", "api", "model-context-protocol"]
@@ -33,10 +34,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/nettskjema-mcp"
-Documentation = "https://github.com/yourusername/nettskjema-mcp#readme"
-Repository = "https://github.com/yourusername/nettskjema-mcp"
-Issues = "https://github.com/yourusername/nettskjema-mcp/issues"
+Homepage = "https://github.com/orjahren/nettskjema-mcp"
+Documentation = "https://github.com/orjahren/nettskjema-mcp#readme"
+Repository = "https://github.com/orjahren/nettskjema-mcp"
+Issues = "https://github.com/orjahren/nettskjema-mcp/issues"
 
 [build-system]
 requires = ["hatchling"]

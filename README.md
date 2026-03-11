@@ -150,7 +150,7 @@ Use send_reminder to remind people who haven't responded yet.
 
 ## API Documentation
 
-Full Nettskjema API documentation: https://nettskjema.no/api/v3/v3/api-docs
+Full Nettskjema API documentation: https://nettskjema.no/apidoc
 
 ## License
 

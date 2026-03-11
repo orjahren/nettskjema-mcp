@@ -13,9 +13,14 @@ This is a Model Context Protocol (MCP) server for the Nettskjema API, built usin
 
 ### API Integration
 - Base URL: `https://nettskjema.no/api/v3`
-- Authentication: Bearer token via `NETTSKJEMA_API_TOKEN` environment variable
+- Auth URL: `https://authorization.nettskjema.no/oauth2/token`
+- Authentication: OAuth 2.1 client credentials flow
+  - Requires `NETTSKJEMA_CLIENT_ID` and `NETTSKJEMA_CLIENT_SECRET`
+  - Tokens are JWTs valid for 24 hours (86,400 seconds)
+  - Tokens are cached in memory and auto-refreshed
 - All endpoints require authentication
 - Use httpx for async HTTP requests
+- Client username format: `<clientId>@apiclient`
 
 ### Adding New Tools
 When adding new tools:

@@ -4,11 +4,20 @@ This guide explains how to test the Nettskjema MCP server.
 
 ## Prerequisites
 
-1. **API Token**: Get your Nettskjema API token from https://nettskjema.no/user/token
-2. **Environment Setup**: Add the token to your `.env` file:
+1. **API Client Credentials**:
+   - Create an API client at https://authorization.nettskjema.no/
+   - Register a new client and save your `clientId` and `clientSecret`
+   - **Important**: The clientSecret is shown only once!
+
+2. **Environment Setup**: Add your credentials to the `.env` file:
+   ```env
+   NETTSKJEMA_CLIENT_ID=your_client_id_here
+   NETTSKJEMA_CLIENT_SECRET=your_client_secret_here
    ```
-   NETTSKJEMA_API_TOKEN=your_actual_token_here
-   ```
+
+3. **Form Access**: Add your API client to form permissions:
+   - Your client username: `<clientId>@apiclient`
+   - Add to form: Settings → Permissions → Editing permissions
 
 ## Running Tests
 
@@ -51,8 +60,9 @@ import asyncio
 import os
 from server import list_my_forms, get_form_info
 
-# Set environment variable if not in .env
-os.environ['NETTSKJEMA_API_TOKEN'] = 'your_token_here'
+# Set environment variables if not in .env
+os.environ['NETTSKJEMA_CLIENT_ID'] = 'your_client_id'
+os.environ['NETTSKJEMA_CLIENT_SECRET'] = 'your_client_secret'
 
 async def test():
     # Test listing forms
@@ -108,10 +118,24 @@ The server includes error handling for common issues:
 
 If you encounter issues:
 
-1. **Check API Token**: Ensure it's valid and not expired
-2. **Check Form Access**: Verify you have permission to access the forms
-3. **Check API Status**: Visit https://nettskjema.no to ensure the service is running
-4. **Enable Debug Logging**: Add logging to the server for more details:
+1. **Check OAuth Credentials**:
+   - Ensure `NETTSKJEMA_CLIENT_ID` and `NETTSKJEMA_CLIENT_SECRET` are set correctly
+   - Verify your clientSecret hasn't expired (valid for 365 days)
+   - Check credentials at https://authorization.nettskjema.no/
+
+2. **Check Form Access**:
+   - Your client username is: `<clientId>@apiclient`
+   - Verify this username is added to the form's editing permissions
+   - Go to: Settings → Permissions → Editing permissions
+
+3. **Check Token Issues**:
+   - OAuth tokens are cached for 24 hours and auto-refresh
+   - If you get 401 errors, the token cache may be stale
+   - Restart the server to force a new token fetch
+
+4. **Check API Status**: Visit https://nettskjema.no to ensure the service is running
+
+5. **Enable Debug Logging**: Add logging to the server for more details:
 
 ```python
 import logging
@@ -131,7 +155,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "python",
       "args": ["/path/to/nettskjema-mcp/server.py"],
       "env": {
-        "NETTSKJEMA_API_TOKEN": "your_token_here"
+        "NETTSKJEMA_CLIENT_ID": "your_client_id_here",
+        "NETTSKJEMA_CLIENT_SECRET": "your_client_secret_here"
       }
     }
   }
@@ -161,7 +186,14 @@ asyncio.run(performance_test())
 
 ## Security Testing
 
-- **Never commit** your API token to version control
-- **Use environment variables** for sensitive data
-- **Test token rotation**: Ensure the server handles token updates gracefully
+- **Never commit** your `clientSecret` to version control - treat it like a password
+- **Use environment variables** for sensitive credentials
+- **Token Management**:
+  - OAuth tokens are automatically cached and refreshed
+  - Tokens expire after 24 hours
+  - The server handles token refresh transparently
 - **Verify HTTPS**: All API requests use HTTPS
+- **Client Credentials Security**:
+  - clientSecret expires after 365 days
+  - Store it securely (password manager, secret vault, etc.)
+  - It's shown only once when created

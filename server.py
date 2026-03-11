@@ -6,24 +6,66 @@ A Model Context Protocol server for interacting with the Nettskjema API.
 import os
 import json
 from typing import Optional, Any
+from datetime import datetime, timedelta
 import httpx
 from fastmcp import FastMCP
 
 # Initialize FastMCP server
 mcp = FastMCP("nettskjema")
 
-# Base URL for Nettskjema API
+# Base URLs
 BASE_URL = "https://nettskjema.no/api/v3"
+AUTH_URL = "https://authorization.nettskjema.no/oauth2/token"
+
+# Token cache
+_token_cache: Optional[dict[str, Any]] = None
 
 
-def get_auth_headers() -> dict[str, str]:
-    """Get authorization headers with bearer token from environment."""
-    token = os.getenv("NETTSKJEMA_API_TOKEN")
-    if not token:
+async def get_oauth_token() -> str:
+    """
+    Get OAuth 2.1 access token using client credentials flow.
+    Tokens are cached and reused for their 24-hour lifetime.
+    """
+    global _token_cache
+
+    # Check if we have a valid cached token
+    if _token_cache and datetime.now() < _token_cache["expires_at"]:
+        return _token_cache["access_token"]
+
+    # Get credentials from environment
+    client_id = os.getenv("NETTSKJEMA_CLIENT_ID")
+    client_secret = os.getenv("NETTSKJEMA_CLIENT_SECRET")
+
+    if not client_id or not client_secret:
         raise ValueError(
-            "NETTSKJEMA_API_TOKEN environment variable not set. "
-            "Please set your Nettskjema API token."
+            "NETTSKJEMA_CLIENT_ID and NETTSKJEMA_CLIENT_SECRET environment variables must be set. "
+            "Get your credentials from https://authorization.nettskjema.no/"
         )
+
+    # Request new token
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            AUTH_URL,
+            auth=(client_id, client_secret),
+            data={"grant_type": "client_credentials"},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        token_data = response.json()
+
+    # Cache token (expires in 24h, we'll refresh after 23h to be safe)
+    expires_in = token_data.get("expires_in", 86400)  # Default 24h
+    _token_cache = {
+        "access_token": token_data["access_token"],
+        "expires_at": datetime.now() + timedelta(seconds=expires_in - 3600),  # 1h buffer
+    }
+
+    return _token_cache["access_token"]
+
+
+async def get_auth_headers() -> dict[str, str]:
+    """Get authorization headers with OAuth bearer token."""
+    token = await get_oauth_token()
     return {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
@@ -37,12 +79,14 @@ async def api_request(
     json_data: Optional[dict[str, Any]] = None,
 ) -> Any:
     """Make an authenticated request to the Nettskjema API."""
+    headers = await get_auth_headers()
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.request(
                 method=method,
                 url=f"{BASE_URL}{endpoint}",
-                headers=get_auth_headers(),
+                headers=headers,
                 params=params,
                 json=json_data,
                 timeout=30.0,
@@ -72,6 +116,29 @@ async def get_user_info() -> str:
     """Get information about the authenticated user."""
     result = await api_request("GET", "/me")
     return format_response(result)
+
+
+@mcp.tool()
+async def check_auth_status() -> str:
+    """
+    Check OAuth authentication status and token information.
+    Useful for debugging authentication issues.
+    """
+    client_id = os.getenv("NETTSKJEMA_CLIENT_ID")
+    client_secret = os.getenv("NETTSKJEMA_CLIENT_SECRET")
+
+    status = {
+        "client_id_set": bool(client_id),
+        "client_secret_set": bool(client_secret),
+        "client_username": f"{client_id}@apiclient" if client_id else None,
+        "token_cached": _token_cache is not None,
+    }
+
+    if _token_cache:
+        status["token_expires_at"] = _token_cache["expires_at"].isoformat()
+        status["token_valid"] = datetime.now() < _token_cache["expires_at"]
+
+    return format_response(status)
 
 
 @mcp.tool()

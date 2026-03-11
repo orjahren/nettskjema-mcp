@@ -4,11 +4,13 @@ Model Context Protocol (MCP) server for the Nettskjema API. This server provides
 
 ## Features
 
+- **OAuth 2.1 Authentication**: Secure client credentials flow with 24-hour token caching
 - **Form Management**: List, retrieve, and update forms
 - **Submissions**: Access and manage form submissions
 - **Invitations**: Create and manage form invitations
-- **Data Export**: Export form responses as CSV
+- **Data Export**: Export form responses as CSV, Excel, and SPSS
 - **User Information**: Get authenticated user details
+- **Automatic Token Management**: Tokens are cached and automatically refreshed
 
 ## Installation
 
@@ -33,19 +35,41 @@ uv pip install -e .
 
 ## Configuration
 
-1. Create a `.env` file from the example:
+### 1. Create API Client Credentials
+
+1. Log into https://authorization.nettskjema.no/
+2. Click **"Register client"**
+3. Provide a client name and email
+4. **Save the clientSecret immediately** - it's shown only once!
+5. Note your `clientId` and `clientSecret`
+
+### 2. Configure Environment Variables
+
+Create a `.env` file from the example:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Get your Nettskjema API token from: https://nettskjema.no/user/token
+Add your credentials to the `.env` file:
 
-3. Add your token to the `.env` file:
+```env
+NETTSKJEMA_CLIENT_ID=your_client_id_here
+NETTSKJEMA_CLIENT_SECRET=your_client_secret_here
+```
 
-```
-NETTSKJEMA_API_TOKEN=your_actual_token_here
-```
+**Security Note:** Never commit or hardcode your `clientSecret` in code. It's like a password and valid for 365 days. Store it in environment variables or a secure vault.
+
+**Token Management:** OAuth access tokens are valid for 24 hours and are automatically cached and reused by the server. You don't need to manage token refresh manually.
+
+### 3. Grant Form Access
+
+Your API client username is: `<clientId>@apiclient`
+
+For each form you want to access, add this username to the form permissions:
+- Open the form in Nettskjema
+- Go to: **Settings → Permissions → Editing permissions**
+- Add your client username
 
 ## Usage
 
@@ -74,7 +98,8 @@ Add this to your MCP client configuration (e.g., Claude Desktop config):
       "command": "python",
       "args": ["/path/to/nettskjema-mcp/server.py"],
       "env": {
-        "NETTSKJEMA_API_TOKEN": "your_token_here"
+        "NETTSKJEMA_CLIENT_ID": "your_client_id_here",
+        "NETTSKJEMA_CLIENT_SECRET": "your_client_secret_here"
       }
     }
   }
@@ -89,7 +114,8 @@ Or if installed via pip:
     "nettskjema": {
       "command": "nettskjema-mcp",
       "env": {
-        "NETTSKJEMA_API_TOKEN": "your_token_here"
+        "NETTSKJEMA_CLIENT_ID": "your_client_id_here",
+        "NETTSKJEMA_CLIENT_SECRET": "your_client_secret_here"
       }
     }
   }
@@ -98,9 +124,13 @@ Or if installed via pip:
 
 ## Available Tools
 
-### User & Forms
+### Authentication & User
 
+- `check_auth_status` - Check OAuth authentication status and token info (debugging)
 - `get_user_info` - Get authenticated user information
+
+### Forms
+
 - `list_my_forms` - List all your forms
 - `create_form` - Create a new form
 - `delete_forms` - Delete forms with trash retention

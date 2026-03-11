@@ -41,8 +41,11 @@ The MCP Inspector is a tool for debugging MCP servers:
 # Install MCP Inspector
 npm install -g @modelcontextprotocol/inspector
 
-# Run the inspector
-mcp-inspector python server.py
+# Run the inspector with the package module
+mcp-inspector python -m nettskjema_mcp
+
+# Or if installed
+mcp-inspector nettskjema-mcp
 ```
 
 This will open a web interface where you can:
@@ -58,7 +61,7 @@ You can also test individual functions by importing them:
 ```python
 import asyncio
 import os
-from server import list_my_forms, get_form_info
+from nettskjema_mcp import list_my_forms, get_form_info
 
 # Set environment variables if not in .env
 os.environ['NETTSKJEMA_CLIENT_ID'] = 'your_client_id'
@@ -152,8 +155,25 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "nettskjema": {
+      "command": "nettskjema-mcp",
+      "env": {
+        "NETTSKJEMA_CLIENT_ID": "your_client_id_here",
+        "NETTSKJEMA_CLIENT_SECRET": "your_client_secret_here"
+      }
+    }
+  }
+}
+```
+
+Or for development mode:
+
+```json
+{
+  "mcpServers": {
+    "nettskjema": {
       "command": "python",
-      "args": ["/path/to/nettskjema-mcp/server.py"],
+      "args": ["-m", "nettskjema_mcp"],
+      "cwd": "/path/to/nettskjema-mcp",
       "env": {
         "NETTSKJEMA_CLIENT_ID": "your_client_id_here",
         "NETTSKJEMA_CLIENT_SECRET": "your_client_secret_here"

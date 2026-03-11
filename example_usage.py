@@ -6,13 +6,7 @@ Note: In practice, these tools are called through an MCP client, not directly.
 """
 
 import asyncio
-from server import (
-    get_user_info,
-    list_my_forms,
-    get_form_info,
-    get_form_elements,
-    get_submission_metadata,
-)
+from nettskjema_mcp import get_user_info, list_my_forms
 
 
 async def main():
@@ -27,7 +21,7 @@ async def main():
     try:
         user_info = await get_user_info()
         print(f"User info: {user_info}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error: {e}")
 
     # List all forms
@@ -35,7 +29,7 @@ async def main():
     try:
         forms = await list_my_forms()
         print(f"Forms: {forms}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error: {e}")
 
     # Example: Get specific form info (replace with actual form_id)

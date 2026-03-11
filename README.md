@@ -75,28 +75,34 @@ For each form you want to access, add this username to the form permissions:
 
 ### Running the Server
 
-You can run the server directly:
-
-```bash
-python server.py
-```
-
-Or using the installed command:
+After installation, you can run the server using the installed command:
 
 ```bash
 nettskjema-mcp
+```
+
+Or run as a Python module:
+
+```bash
+python -m nettskjema_mcp
+```
+
+For development (without installation):
+
+```bash
+python -m nettskjema_mcp
 ```
 
 ### MCP Client Configuration
 
 Add this to your MCP client configuration (e.g., Claude Desktop config):
 
+**Option 1: Using installed command (recommended)**
 ```json
 {
   "mcpServers": {
     "nettskjema": {
-      "command": "python",
-      "args": ["/path/to/nettskjema-mcp/server.py"],
+      "command": "nettskjema-mcp",
       "env": {
         "NETTSKJEMA_CLIENT_ID": "your_client_id_here",
         "NETTSKJEMA_CLIENT_SECRET": "your_client_secret_here"
@@ -106,13 +112,14 @@ Add this to your MCP client configuration (e.g., Claude Desktop config):
 }
 ```
 
-Or if installed via pip:
-
+**Option 2: Using Python module (for development)**
 ```json
 {
   "mcpServers": {
     "nettskjema": {
-      "command": "nettskjema-mcp",
+      "command": "python",
+      "args": ["-m", "nettskjema_mcp"],
+      "cwd": "/path/to/nettskjema-mcp",
       "env": {
         "NETTSKJEMA_CLIENT_ID": "your_client_id_here",
         "NETTSKJEMA_CLIENT_SECRET": "your_client_secret_here"

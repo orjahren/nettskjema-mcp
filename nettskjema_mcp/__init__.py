@@ -10,6 +10,35 @@ from datetime import datetime, timedelta
 import httpx
 from fastmcp import FastMCP
 
+__version__ = "0.1.0"
+__all__ = [
+    "mcp",
+    "get_user_info",
+    "check_auth_status",
+    "list_my_forms",
+    "get_form_info",
+    "get_form_settings",
+    "get_form_elements",
+    "get_submission",
+    "get_submission_metadata",
+    "list_my_submissions",
+    "get_form_answers",
+    "export_form_csv",
+    "get_invitations",
+    "create_invitation",
+    "delete_submissions",
+    "lookup_form_by_title",
+    "update_form_settings",
+    "send_reminder",
+    "create_form",
+    "delete_forms",
+    "get_form_definition",
+    "submit_form",
+    "delete_invitations",
+    "export_form_excel",
+    "get_spss_syntax",
+]
+
 # Initialize FastMCP server
 mcp = FastMCP("nettskjema")
 
@@ -454,5 +483,10 @@ async def get_spss_syntax(form_id: int) -> str:
     return result  # Return as-is since it's syntax text
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Main entry point for the CLI."""
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()

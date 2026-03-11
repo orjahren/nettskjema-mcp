@@ -13,17 +13,20 @@ Model Context Protocol (MCP) server for the Nettskjema API. This server provides
 ## Installation
 
 1. Clone this repository:
+
 ```bash
 git clone <repository-url>
 cd nettskjema-mcp
 ```
 
 2. Install dependencies using pip:
+
 ```bash
 pip install -e .
 ```
 
 Or using uv:
+
 ```bash
 uv pip install -e .
 ```
@@ -31,6 +34,7 @@ uv pip install -e .
 ## Configuration
 
 1. Create a `.env` file from the example:
+
 ```bash
 cp .env.example .env
 ```
@@ -38,6 +42,7 @@ cp .env.example .env
 2. Get your Nettskjema API token from: https://nettskjema.no/user/token
 
 3. Add your token to the `.env` file:
+
 ```
 NETTSKJEMA_API_TOKEN=your_actual_token_here
 ```
@@ -47,11 +52,13 @@ NETTSKJEMA_API_TOKEN=your_actual_token_here
 ### Running the Server
 
 You can run the server directly:
+
 ```bash
 python server.py
 ```
 
 Or using the installed command:
+
 ```bash
 nettskjema-mcp
 ```
@@ -75,6 +82,7 @@ Add this to your MCP client configuration (e.g., Claude Desktop config):
 ```
 
 Or if installed via pip:
+
 ```json
 {
   "mcpServers": {
@@ -91,6 +99,7 @@ Or if installed via pip:
 ## Available Tools
 
 ### User & Forms
+
 - `get_user_info` - Get authenticated user information
 - `list_my_forms` - List all your forms
 - `create_form` - Create a new form
@@ -103,6 +112,7 @@ Or if installed via pip:
 - `lookup_form_by_title` - Find form ID by short title
 
 ### Submissions
+
 - `submit_form` - Submit a response to a form
 - `get_submission` - Get a single submission with answers
 - `get_submission_metadata` - Get metadata for all submissions
@@ -111,11 +121,13 @@ Or if installed via pip:
 - `delete_submissions` - Delete specific submissions
 
 ### Data Export
+
 - `export_form_csv` - Export responses as CSV
 - `export_form_excel` - Export responses as Excel
 - `get_spss_syntax` - Generate SPSS syntax file
 
 ### Invitations
+
 - `get_invitations` - List all form invitations
 - `create_invitation` - Create new invitation with optional SMS
 - `delete_invitations` - Delete specific invitations
@@ -126,23 +138,27 @@ Or if installed via pip:
 After installation and configuration, you can use the MCP server with any MCP-compatible client. Here are some example use cases:
 
 ### List Your Forms
+
 ```
 Use the list_my_forms tool to see all forms you have access to.
 ```
 
 ### Get Form Details
+
 ```
 Use get_form_info with a form_id to see the form's metadata.
 Use get_form_elements to see all questions in the form.
 ```
 
 ### Export Data
+
 ```
 Use export_form_csv or export_form_excel to download form responses.
 Use get_form_answers to get raw answer data.
 ```
 
 ### Manage Invitations
+
 ```
 Use create_invitation to invite someone to fill out a form.
 Use send_reminder to remind people who haven't responded yet.

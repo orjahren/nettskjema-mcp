@@ -5,7 +5,9 @@ Model Context Protocol (MCP) server for the Nettskjema API. This server provides
 ## Features
 
 - **OAuth 2.1 Authentication**: Secure client credentials flow with 24-hour token caching
-- **Form Management**: List, retrieve, and update forms
+- **Form Management**: Create, list, retrieve, and update forms
+- **Form Elements**: Add, update, delete, and reorder form questions/elements
+- **AI-Assisted Form Building**: Perfect for Next.js integration with LLMs
 - **Submissions**: Access and manage form submissions
 - **Invitations**: Create and manage form invitations
 - **Data Export**: Export form responses as CSV, Excel, and SPSS
@@ -148,6 +150,14 @@ Add this to your MCP client configuration (e.g., Claude Desktop config):
 - `update_form_settings` - Update form settings
 - `lookup_form_by_title` - Find form ID by short title
 
+### Form Elements (Questions)
+
+- `add_form_element` - Add a new question/element to a form
+- `update_form_element` - Update an existing form element
+- `delete_form_element` - Delete a form element
+- `reorder_form_elements` - Reorder elements in a form
+- `duplicate_form_element` - Duplicate an existing element
+
 ### Submissions
 
 - `submit_form` - Submit a response to a form
@@ -201,9 +211,32 @@ Use create_invitation to invite someone to fill out a form.
 Use send_reminder to remind people who haven't responded yet.
 ```
 
+## Next.js Integration
+
+This MCP server is designed to work seamlessly with Next.js for AI-assisted form building. See the [Next.js Integration Guide](NEXTJS_INTEGRATION.md) for detailed instructions.
+
+### Quick Start for Next.js
+
+1. Install the MCP SDK in your Next.js project:
+```bash
+npm install @modelcontextprotocol/sdk openai
+```
+
+2. Check out the [nextjs-example](nextjs-example/) directory for complete working examples:
+   - API route implementation
+   - React component
+   - TypeScript type definitions
+
+3. Use case: Let your editors describe forms in natural language, and AI will build them automatically using the MCP tools.
+
+Example user prompts:
+- "Create a customer feedback form with name, email, rating (1-5), and comments"
+- "Create an event registration form with dietary restrictions"
+- "Add a question about age to form 12345"
+
 ## API Documentation
 
-Full Nettskjema API documentation: https://nettskjema.no/apidoc
+Full Nettskjema API documentation: https://nettskjema.no/api/v3/v3/api-docs
 
 ## License
 

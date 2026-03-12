@@ -22,6 +22,15 @@ This is a Model Context Protocol (MCP) server for the Nettskjema API, built usin
 - Use httpx for async HTTP requests
 - Client username format: `<clientId>@apiclient`
 
+### Available Tools
+
+The server provides tools for:
+- **Form Management**: create_form, delete_forms, update_form_settings, etc.
+- **Form Elements**: add_form_element, update_form_element, delete_form_element, reorder_form_elements, duplicate_form_element
+- **Submissions**: get_submission, list_my_submissions, delete_submissions, etc.
+- **Invitations**: create_invitation, get_invitations, delete_invitations, send_reminder
+- **Data Export**: export_form_csv, export_form_excel, get_spss_syntax
+
 ### Adding New Tools
 When adding new tools:
 1. Use the `@mcp.tool()` decorator
@@ -29,6 +38,7 @@ When adding new tools:
 3. Use the `api_request()` helper function
 4. Handle errors appropriately
 5. Return string representations of results
+6. Add to __all__ export list
 
 ### Testing
 - Ensure NETTSKJEMA_API_TOKEN is set before testing

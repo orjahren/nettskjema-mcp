@@ -37,6 +37,11 @@ __all__ = [
     "delete_invitations",
     "export_form_excel",
     "get_spss_syntax",
+    "add_form_element",
+    "update_form_element",
+    "delete_form_element",
+    "reorder_form_elements",
+    "duplicate_form_element",
 ]
 
 # Initialize FastMCP server
@@ -512,6 +517,148 @@ async def get_spss_syntax(form_id: int) -> str:
     """
     result = await api_request("GET", f"/form/{form_id}/spss-syntax")
     return result  # Return as-is since it's syntax text
+
+
+@mcp.tool()
+async def add_form_element(
+    form_id: int,
+    element_type: str,
+    question_text: str,
+    description: Optional[str] = None,
+    required: bool = False,
+    options: Optional[list[str]] = None,
+    position: Optional[int] = None,
+) -> str:
+    """
+    Add a new element (question) to a form.
+
+    Args:
+        form_id: The ID of the form
+        element_type: Type of question. Common types:
+            - "text": Single-line text input
+            - "textarea": Multi-line text input
+            - "radio": Single choice radio buttons
+            - "checkbox": Multiple choice checkboxes
+            - "select": Dropdown selection
+            - "number": Numeric input
+            - "email": Email input
+            - "date": Date picker
+            - "matrix": Matrix/grid question
+        question_text: The question text to display
+        description: Optional help text/description for the question
+        required: Whether the question is required (default: False)
+        options: List of options for radio/checkbox/select questions (required for those types)
+        position: Optional position/order in the form (0-based index)
+    """
+    element_data: dict[str, Any] = {
+        "elementType": element_type,
+        "questionText": question_text,
+        "required": required,
+    }
+
+    if description:
+        element_data["description"] = description
+
+    if options:
+        element_data["options"] = options
+
+    if position is not None:
+        element_data["position"] = position
+
+    result = await api_request(
+        "POST",
+        f"/form/{form_id}/elements",
+        json_data=element_data
+    )
+    return format_response(result)
+
+
+@mcp.tool()
+async def update_form_element(
+    form_id: int,
+    element_id: int,
+    question_text: Optional[str] = None,
+    description: Optional[str] = None,
+    required: Optional[bool] = None,
+    options: Optional[list[str]] = None,
+) -> str:
+    """
+    Update an existing form element.
+
+    Args:
+        form_id: The ID of the form
+        element_id: The ID of the element to update
+        question_text: New question text (optional)
+        description: New description/help text (optional)
+        required: Whether the question is required (optional)
+        options: New list of options for radio/checkbox/select questions (optional)
+    """
+    updates: dict[str, Any] = {}
+
+    if question_text is not None:
+        updates["questionText"] = question_text
+    if description is not None:
+        updates["description"] = description
+    if required is not None:
+        updates["required"] = required
+    if options is not None:
+        updates["options"] = options
+
+    result = await api_request(
+        "PATCH",
+        f"/form/{form_id}/elements/{element_id}",
+        json_data=updates
+    )
+    return format_response(result)
+
+
+@mcp.tool()
+async def delete_form_element(form_id: int, element_id: int) -> str:
+    """
+    Delete a form element.
+
+    Args:
+        form_id: The ID of the form
+        element_id: The ID of the element to delete
+    """
+    result = await api_request(
+        "DELETE",
+        f"/form/{form_id}/elements/{element_id}"
+    )
+    return format_response(result)
+
+
+@mcp.tool()
+async def reorder_form_elements(form_id: int, element_order: list[int]) -> str:
+    """
+    Reorder form elements by providing a new order of element IDs.
+
+    Args:
+        form_id: The ID of the form
+        element_order: List of element IDs in the desired order
+    """
+    result = await api_request(
+        "PUT",
+        f"/form/{form_id}/elements/order",
+        json_data={"elementOrder": element_order}
+    )
+    return format_response(result)
+
+
+@mcp.tool()
+async def duplicate_form_element(form_id: int, element_id: int) -> str:
+    """
+    Duplicate an existing form element.
+
+    Args:
+        form_id: The ID of the form
+        element_id: The ID of the element to duplicate
+    """
+    result = await api_request(
+        "POST",
+        f"/form/{form_id}/elements/{element_id}/duplicate"
+    )
+    return format_response(result)
 
 
 def main() -> None:

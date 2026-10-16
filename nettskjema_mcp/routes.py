@@ -30,6 +30,35 @@ REGISTRY: dict[str, tuple[Route, ...]] = {}
 # Tools that have no associated route (local operations only)
 LOCAL_TOOLS: frozenset[str] = frozenset({"check_auth_status"})
 
+# Routes whose success body, not their status, carries the outcome.
+#
+# A handful of operations declare an ErrorMessage schema on a plain 2xx: the
+# request was understood, and the body says whether the change was applied. The
+# client checks the body of a response from one of these and raises when it
+# reports field errors, because a rejected write that arrives under HTTP 200
+# would otherwise be handed to the model as an ordinary result.
+#
+# The knowledge lives here, next to the routes, rather than in each tool: a tool
+# that forgot the check would reintroduce the hole silently. A contract test
+# derives the same set from the vendored spec and fails if this one drifts.
+ERROR_BODY_ROUTES: frozenset[Route] = frozenset(
+    {
+        Route("PUT", "/form/{formId}/elements"),
+    }
+)
+
+# Routes with an ErrorMessage-shaped 2xx that are deliberately *not* checked,
+# with the reason. Add to this rather than quietly leaving a route out of
+# ERROR_BODY_ROUTES: the contract test requires every such route to appear in
+# one of the two.
+ERROR_BODY_EXEMPT: dict[Route, str] = {
+    Route("GET", "/form/{formId}/settings/validation"): (
+        "the ErrorMessage body is the answer, not a failure report: this route exists to "
+        "list a form's outstanding settings problems, and raising on them would leave the "
+        "tool unable to report the thing it was asked for"
+    ),
+}
+
 # Out-of-scope routes with reasons for exclusion
 OUT_OF_SCOPE: dict[tuple[str, str], str] = {
     ("GET", "/form/{formId}/invitations"): (

@@ -44,6 +44,15 @@ THREE_ELEMENTS: list[dict[str, object]] = [
     {"elementId": 33, "elementType": "PAGE_BREAK", "sequence": 3},
 ]
 
+# The spec declares this endpoint's 200 as ErrorMessage, so a rejected write
+# arrives with a clean status and the refusal only in the body. "empty" is the
+# Spring MultiValueMap artefact the extractor must drop.
+REJECTION_BODY: dict[str, object] = {
+    "message": "Validation failed",
+    "errors": {"elements[0].text": ["must not be blank"], "empty": False},
+    "confirmForceCleanupErrors": {},
+}
+
 
 def _body(route: respx.Route) -> object:
     """Decode the JSON body of a route's last request."""
@@ -81,6 +90,62 @@ async def test_replace_form_elements_sends_a_bare_array(respx_mock: respx.MockRo
     # Assert the raw bytes: the wrapping defect is invisible to a parsed comparison
     # of the inner list.
     assert route.calls.last.request.content == b'[{"elementType":"TEXT","text":"Hello"}]'
+
+
+async def test_replace_form_elements_raises_when_a_200_reports_field_errors(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """
+    A 200 whose ErrorMessage body carries field errors must not read as success.
+
+    The spec declares this endpoint's 200 as ErrorMessage, so the status says the
+    request was understood and only the body says whether it was applied. Handing
+    that body back as an ordinary result reports a write that did not happen.
+    """
+    respx_mock.put(ELEMENTS_URL).mock(return_value=httpx.Response(200, json=REJECTION_BODY))
+
+    with pytest.raises(ToolError) as caught:
+        await replace_form_elements(123, [{"elementType": "TEXT", "text": ""}])
+
+    message = str(caught.value)
+    assert "Validation failed" in message
+    assert "elements[0].text" in message
+    assert "must not be blank" in message
+    # The MultiValueMap artefact is not reported as a failing field.
+    assert "empty" not in message
+
+
+async def test_update_form_element_raises_when_a_200_reports_field_errors(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """update_form_element() inherits the body check from the same PUT route."""
+    respx_mock.get(ELEMENTS_URL).mock(return_value=httpx.Response(200, json=THREE_ELEMENTS))
+    respx_mock.put(ELEMENTS_URL).mock(return_value=httpx.Response(200, json=REJECTION_BODY))
+
+    with pytest.raises(ToolError) as caught:
+        await update_form_element(123, 22, {"text": ""})
+
+    assert "elements[0].text" in str(caught.value)
+
+
+async def test_replace_form_elements_accepts_a_200_with_no_field_errors(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """
+    An absent or empty errors object on this route is a genuine success.
+
+    The predicate is "carries a real field error", not "has an errors key": an
+    ErrorMessage body saying nothing went wrong must still come back as a result.
+    """
+    respx_mock.put(ELEMENTS_URL).mock(
+        return_value=httpx.Response(
+            200, json={"message": "OK", "errors": {"empty": True}, "confirmForceCleanupErrors": {}}
+        )
+    )
+
+    result = await replace_form_elements(123, [{"elementType": "TEXT", "text": "Hello"}])
+
+    assert json.loads(result)["message"] == "OK"
 
 
 async def test_replace_form_elements_validates_each_element(

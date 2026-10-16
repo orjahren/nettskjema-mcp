@@ -28,9 +28,10 @@ from nettskjema_mcp.errors import (
     UpstreamError,
     _extract_field_errors,
     error_for_status,
+    error_for_success_body,
     trim_excerpt,
 )
-from nettskjema_mcp.routes import Route
+from nettskjema_mcp.routes import ERROR_BODY_ROUTES, Route
 
 logger = logging.getLogger(__name__)
 
@@ -186,12 +187,15 @@ class NettskjemaClient:
 
         Raises:
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
+            PartialSuccessError: For a clean 2xx from a route in
+                ERROR_BODY_ROUTES whose body reports the change was rejected.
             UpstreamError: If a successful response carried a body that is not JSON.
         """
         request = await self._build_request(route, path, query, json_body=body)
         response = await self._send(request)
         payload = _decode_body(response)
         self._check_status(route, response, payload)
+        self._check_error_body(route, response, payload)
         if response.status_code == 204 or not response.content:
             return no_content_result(response.status_code)
         if isinstance(payload, _NotJson):
@@ -477,6 +481,23 @@ class NettskjemaClient:
         if _is_success(status):
             return
         raise error_for_status(status, _error_body(route, response, payload))
+
+    def _check_error_body(self, route: Route, response: httpx.Response, payload: object) -> None:
+        """
+        Raise when a clean 2xx reports, in its body, that the change was rejected.
+
+        Only routes listed in ``routes.ERROR_BODY_ROUTES`` are checked: they are
+        the ones the vendored spec declares with an ErrorMessage success schema,
+        where a 200 means "understood", not "applied". For every other route a
+        2xx body is the result and must be returned untouched.
+        """
+        if route not in ERROR_BODY_ROUTES:
+            return
+        failure = error_for_success_body(
+            f"{route.method} {route.path}", response.status_code, payload
+        )
+        if failure is not None:
+            raise failure
 
     async def _check_streamed_status(self, route: Route, response: httpx.Response) -> None:
         """Read and raise on a streamed response that did not succeed."""

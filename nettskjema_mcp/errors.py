@@ -178,6 +178,54 @@ def _extract_field_errors(errors_obj: object) -> dict[str, list[str]]:
     return field_errors
 
 
+def error_for_success_body(where: str, status: int, body: object) -> PartialSuccessError | None:
+    """
+    Build the error for a clean 2xx whose body reports that the change was rejected.
+
+    A few routes declare their success response as ErrorMessage: the status only
+    says the request was understood, and the body says whether anything was
+    applied. ``error_for_status`` cannot fire on them, because nothing about the
+    status is wrong — 207 is the only 2xx it treats as a failure, and these
+    answer 200. Without this check the rejection is handed to the model as an
+    ordinary result and reads as success.
+
+    An absent or empty ``errors`` on such a route is a genuine success and stays
+    one. The predicate is "carries at least one real field error", not "has an
+    errors key": ``_extract_field_errors`` already drops the Spring MultiValueMap
+    artefacts (``empty``, ``all``) and any value that is not a list of strings,
+    so ``{"errors": {"empty": true}}`` and ``{"errors": {}}`` both pass.
+
+    Args:
+        where: The route, as "<METHOD> <path>", for the message.
+        status: The HTTP status actually received.
+        body: The decoded response body.
+
+    Returns:
+        A PartialSuccessError when the body reports field errors, otherwise None.
+    """
+    if not isinstance(body, dict):
+        return None
+
+    field_errors = _extract_field_errors(body.get("errors")) or None
+    force_cleanup_errors = _extract_field_errors(body.get("confirmForceCleanupErrors")) or None
+    if field_errors is None and force_cleanup_errors is None:
+        return None
+
+    raw_message = body.get("message")
+    detail = (
+        trim_excerpt(str(raw_message), MAX_MESSAGE_LENGTH)
+        if raw_message
+        else "the response carried no message"
+    )
+    return PartialSuccessError(
+        f"{where} answered HTTP {status}, but its body reports that the change was not "
+        f"applied: {detail}",
+        status=status,
+        field_errors=field_errors,
+        force_cleanup_errors=force_cleanup_errors,
+    )
+
+
 def error_for_status(status: int, body: object) -> NettskjemaError:
     """
     Create an appropriate exception for an HTTP error response.

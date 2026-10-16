@@ -17,7 +17,14 @@ import nettskjema_mcp
 from nettskjema_mcp import server as server_module
 from nettskjema_mcp.client import dump
 from nettskjema_mcp.config import reset_settings
-from nettskjema_mcp.routes import LOCAL_TOOLS, REGISTRY
+from nettskjema_mcp.routes import (
+    ERROR_BODY_EXEMPT,
+    ERROR_BODY_ROUTES,
+    LOCAL_TOOLS,
+    REGISTRY,
+    Route,
+    load_spec,
+)
 from nettskjema_mcp.server import _log_level, bridge_errors, main, mcp, tool
 from nettskjema_mcp.tools.meta import check_auth_status, get_user_info
 from tests.conftest import TEST_BASE_URL
@@ -262,15 +269,19 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
             )
 
 
-async def test_delete_tools_carry_destructive_hint() -> None:
+async def test_delete_and_put_tools_carry_destructive_hint() -> None:
     """
-    Every tool with a DELETE route must carry destructiveHint.
+    Every tool with a DELETE or PUT route must carry destructiveHint.
 
     Clients may warn or require extra confirmation for destructive operations,
-    so missing the hint on a DELETE tool trains users to ignore warnings. A
-    non-DELETE tool may also carry the hint (a later task annotates a PUT as
-    destructive), so this test is one-directional: DELETE requires the hint,
-    but the hint does not require DELETE.
+    so missing the hint on such a tool trains users to ignore warnings. PUT is
+    counted because every PUT in this API is replace semantics — PUT
+    /form/{formId}/elements overwrites a form's whole element list — and that is
+    exactly the kind of call a client must not wave through.
+
+    One-directional: a tool with neither verb may still carry the hint. If a
+    later task adds a PUT that genuinely is not destructive, exempt it here
+    deliberately rather than discovering the rule by deleting the annotation.
     """
     for registered in await mcp.list_tools():
         routes = REGISTRY.get(registered.name)
@@ -279,13 +290,83 @@ async def test_delete_tools_carry_destructive_hint() -> None:
 
         annotations = registered.annotations
         destructive = annotations is not None and annotations.destructiveHint is True
-        has_delete = any(route.method == "DELETE" for route in routes)
+        replacing = sorted({r.method for r in routes if r.method in {"DELETE", "PUT"}})
 
-        if has_delete:
+        if replacing:
             assert destructive, (
-                f"{registered.name} issues DELETE but is not annotated destructiveHint; "
-                'add annotations={"destructiveHint": True}'
+                f"{registered.name} issues {', '.join(replacing)} but is not annotated "
+                'destructiveHint; add annotations={"destructiveHint": True}. If this '
+                "particular PUT genuinely replaces nothing the caller would miss, exempt "
+                "it in this test by name and say why"
             )
+
+
+def _error_message_success_routes() -> set[Route]:
+    """
+    Find every route the spec declares with an ErrorMessage-shaped plain 2xx.
+
+    207 is excluded: the client already raises PartialSuccessError on it from the
+    status alone, so the body check has nothing left to catch there. What is left
+    are the routes where the status is clean and only the body says whether the
+    change was applied.
+    """
+    spec = load_spec()
+    found: set[Route] = set()
+    for path, operations in spec["paths"].items():  # type: ignore[union-attr]
+        for method, operation in operations.items():
+            if method not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            for code, response in operation.get("responses", {}).items():
+                if not code.startswith("2") or code == "207":
+                    continue
+                for media in response.get("content", {}).values():
+                    ref = media.get("schema", {}).get("$ref", "")
+                    if ref.endswith("/ErrorMessage"):
+                        found.add(Route(method.upper(), path))
+    return found
+
+
+def test_every_error_message_success_route_is_classified() -> None:
+    """
+    A route whose success body carries the outcome must be checked, or exempted.
+
+    The spec declares a few operations with an ErrorMessage schema on a plain
+    2xx: HTTP 200 means the request was understood, and the body says whether
+    anything was applied. Returning such a body as an ordinary result reports a
+    rejected write as a successful one — on PUT /form/{formId}/elements, which
+    replaces a form's whole content, that is the worst reply the server can
+    give.
+
+    The check lives in the client, keyed on routes.ERROR_BODY_ROUTES, so a tool
+    cannot forget it. This test keeps that set honest against the spec: a later
+    task that registers another such route fails here until it either adds the
+    route to ERROR_BODY_ROUTES or records in ERROR_BODY_EXEMPT why its body is
+    an answer rather than a failure report.
+    """
+    declared = ERROR_BODY_ROUTES | set(ERROR_BODY_EXEMPT)
+    from_spec = _error_message_success_routes()
+
+    # Every registered route with such a response must be classified. Scoped to
+    # the registry so an unimplemented route is a later task's problem, not a
+    # failure now.
+    registered = {route for routes in REGISTRY.values() for route in routes}
+    for route in sorted(registered & from_spec, key=lambda r: (r.path, r.method)):
+        assert route in declared, (
+            f"{route.method} {route.path} declares an ErrorMessage schema on a plain 2xx, "
+            "so its body decides whether the change was applied. Add it to "
+            "routes.ERROR_BODY_ROUTES so the client raises on a rejection, or to "
+            "routes.ERROR_BODY_EXEMPT with the reason its body is the answer"
+        )
+
+    # And nothing stale: every route we classify must really look like that in
+    # the spec, or the classification is describing a surface that moved.
+    for route in sorted(declared, key=lambda r: (r.path, r.method)):
+        assert route in from_spec, (
+            f"{route.method} {route.path} is classified in routes.py as answering with "
+            "ErrorMessage on a plain 2xx, but the vendored spec no longer says so; "
+            "remove the entry"
+        )
+    assert ERROR_BODY_ROUTES.isdisjoint(ERROR_BODY_EXEMPT)
 
 
 def test_tool_must_be_called_with_parentheses() -> None:

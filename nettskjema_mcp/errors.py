@@ -10,6 +10,13 @@ from nettskjema_mcp.config import get_settings
 MAX_FIELD_ERRORS_RENDERED = 20
 MAX_FIELD_ERROR_LENGTH = 200
 
+# The backend's own `message` field is the most likely place for an unbounded
+# body to arrive, so it is capped here, where it is lifted out of the response.
+# Deliberately larger than client.ERROR_BODY_EXCERPT_LIMIT: the client composes
+# "HTTP <status> <reason> from <route>: <bounded excerpt>" and hands the result
+# in as the message, and that composed string must survive intact.
+MAX_MESSAGE_LENGTH = 1000
+
 
 def trim_excerpt(text: str, limit: int) -> str:
     """
@@ -124,6 +131,9 @@ def error_for_status(status: int, body: object) -> NettskjemaError:
     """
     Create an appropriate exception for an HTTP error response.
 
+    The message is bounded here rather than at the call site, because this is the
+    one point every error body passes through on its way into an exception.
+
     Args:
         status: HTTP status code.
         body: Response body (dict, str, or None).
@@ -136,11 +146,15 @@ def error_for_status(status: int, body: object) -> NettskjemaError:
 
     # Extract message and field errors from body if it's a dict
     if isinstance(body, dict):
-        message = body.get("message", message)
-        if "errorKeysAndErrorMessages" in body:
-            field_errors = body["errorKeysAndErrorMessages"]
+        raw_message = body.get("message")
+        if raw_message:
+            message = trim_excerpt(str(raw_message), MAX_MESSAGE_LENGTH)
+        errors = body.get("errorKeysAndErrorMessages")
+        # Guard the type: a malformed value here would otherwise crash __str__.
+        if isinstance(errors, dict):
+            field_errors = errors
     elif isinstance(body, str):
-        message = body
+        message = trim_excerpt(body, MAX_MESSAGE_LENGTH)
 
     # Special handling for 403: guide users to permission settings
     if status == 403:

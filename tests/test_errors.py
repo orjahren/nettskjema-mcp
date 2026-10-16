@@ -6,6 +6,7 @@ from fastmcp.exceptions import ToolError as FastMCPToolError
 from nettskjema_mcp.errors import (
     MAX_FIELD_ERROR_LENGTH,
     MAX_FIELD_ERRORS_RENDERED,
+    MAX_MESSAGE_LENGTH,
     AuthenticationError,
     BadRequestError,
     ConflictError,
@@ -47,6 +48,62 @@ def test_field_errors_are_preserved() -> None:
     exc = error_for_status(400, body)
     assert exc.field_errors == {"title": ["must not be blank"]}
     assert "title" in str(exc) and "must not be blank" in str(exc)
+
+
+# Every rendered error must fit this budget, whatever the backend sends. It is
+# the sum of the parts: one message (MAX_MESSAGE_LENGTH plus a trim marker) and
+# MAX_FIELD_ERRORS_RENDERED lines, each a field name and a message both capped at
+# MAX_FIELD_ERROR_LENGTH. 1014 + 20 * 432 + the omitted-count line is ~9.7 kB.
+MAX_RENDERED_ERROR_LENGTH = 10_000
+
+
+def test_whole_rendered_error_fits_the_context_budget() -> None:
+    """A huge backend message plus a hundred field errors stay inside the budget."""
+    body = {
+        "message": "x" * 50_000,
+        "errorKeysAndErrorMessages": {f"field{n}": ["y" * 500] for n in range(100)},
+    }
+
+    rendered = str(error_for_status(400, body))
+
+    assert len(rendered) < MAX_RENDERED_ERROR_LENGTH
+
+
+def test_rendered_error_budget_holds_for_long_field_names() -> None:
+    """The budget survives the worst case: every name and message oversized too."""
+    body = {
+        "message": "x" * 50_000,
+        "errorKeysAndErrorMessages": {"n" * 2000 + str(i): ["y" * 2000] for i in range(100)},
+    }
+
+    rendered = str(error_for_status(400, body))
+
+    assert len(rendered) < MAX_RENDERED_ERROR_LENGTH
+
+
+def test_backend_message_is_bounded() -> None:
+    """The backend's own message field must not bypass the excerpt cap."""
+    exc = error_for_status(400, {"message": "x" * 50_000})
+
+    rendered = str(exc)
+
+    assert len(rendered) < MAX_MESSAGE_LENGTH + 100
+    assert rendered.endswith("(truncated)")
+
+
+def test_string_body_is_bounded() -> None:
+    """A plain-string body is capped the same way a dict message is."""
+    exc = error_for_status(502, "z" * 50_000)
+
+    assert len(str(exc)) < MAX_MESSAGE_LENGTH + 100
+
+
+def test_malformed_field_errors_do_not_crash_rendering() -> None:
+    """A non-dict errorKeysAndErrorMessages is ignored rather than breaking __str__."""
+    exc = error_for_status(400, {"message": "bad", "errorKeysAndErrorMessages": "not a dict"})
+
+    assert str(exc) == "bad"
+    assert exc.field_errors == {}
 
 
 def test_field_errors_are_capped_in_count() -> None:

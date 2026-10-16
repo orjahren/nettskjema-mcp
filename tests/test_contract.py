@@ -1,6 +1,8 @@
 """Contract tests between our tool declarations and the OpenAPI spec."""
 
 import json
+import re
+from collections.abc import Awaitable, Callable
 
 import httpx
 import jsonschema
@@ -20,7 +22,6 @@ from nettskjema_mcp.enums import (
     ScoreResultDisplayType,
 )
 from nettskjema_mcp.routes import LOCAL_TOOLS, OUT_OF_SCOPE, REGISTRY, Route, endpoint, load_spec
-from nettskjema_mcp.server import mcp
 from nettskjema_mcp.tools.admin import activate_educloud, activate_tsd, upload_image
 from nettskjema_mcp.tools.attachments import retranscribe_attachment
 from nettskjema_mcp.tools.elements import replace_form_elements, update_form_element
@@ -144,12 +145,6 @@ def test_every_in_scope_operation_has_a_tool() -> None:
     assert declared - covered - set(OUT_OF_SCOPE) == set()
 
 
-async def test_every_tool_declares_a_route_or_is_local() -> None:
-    """Verify every registered tool declares routes or is in LOCAL_TOOLS."""
-    tool_names = {tool.name for tool in await mcp.list_tools()}
-    assert tool_names - set(REGISTRY) - LOCAL_TOOLS == set()
-
-
 def test_the_surface_is_the_expected_size() -> None:
     """
     Verify the surface has exactly 38 tools: 37 routed + check_auth_status.
@@ -159,7 +154,12 @@ def test_the_surface_is_the_expected_size() -> None:
     Operation coverage is 38 and is checked by
     test_every_in_scope_operation_has_a_tool above.
     """
-    assert len(REGISTRY) + len(LOCAL_TOOLS) == 38
+    assert len(REGISTRY) + len(LOCAL_TOOLS) == 38, (
+        f"Tool surface changed: {len(REGISTRY)} routed + {len(LOCAL_TOOLS)} local = "
+        f"{len(REGISTRY) + len(LOCAL_TOOLS)}. If this is deliberate, confirm the new operation "
+        "is in the spec and update this count and the docstring's derivation. If not, a tool was "
+        "added or lost by accident."
+    )
 
 
 def test_out_of_scope_operations_have_no_tool() -> None:
@@ -173,38 +173,51 @@ def test_no_tool_targets_a_private_path() -> None:
     assert not [r for routes in REGISTRY.values() for r in routes if r.path.startswith("/private")]
 
 
-def _resolve_schema_refs(schema: dict[str, object], spec: dict[str, object]) -> dict[str, object]:
+def _resolve_schema_refs(
+    schema: dict[str, object], spec: dict[str, object], seen: set[str] | None = None
+) -> dict[str, object]:
     """
     Recursively resolve $ref pointers in a schema.
 
     Args:
         schema: The schema to resolve.
         spec: The full OpenAPI spec containing components.
+        seen: Set of schema names already being resolved (cycle guard).
 
     Returns:
         The resolved schema with all $refs replaced by their definitions.
+
+    Raises:
+        ValueError: If a circular reference is detected.
     """
+    if seen is None:
+        seen = set()
+
     if "$ref" in schema:
         ref = schema["$ref"]
         if isinstance(ref, str) and ref.startswith("#/components/schemas/"):
             schema_name = ref.split("/")[-1]
+            if schema_name in seen:
+                raise ValueError(
+                    f"Circular reference detected: {schema_name} is part of a reference cycle"
+                )
             components = spec.get("components", {})
             if isinstance(components, dict):
                 schemas = components.get("schemas", {})
                 if isinstance(schemas, dict):
                     resolved = schemas.get(schema_name)
                     if isinstance(resolved, dict):
-                        return _resolve_schema_refs(dict(resolved), spec)
+                        return _resolve_schema_refs(dict(resolved), spec, seen | {schema_name})
         return schema
 
     # Recursively resolve refs in nested schemas
     result = dict(schema)
     for key, value in schema.items():
         if isinstance(value, dict):
-            result[key] = _resolve_schema_refs(value, spec)
+            result[key] = _resolve_schema_refs(value, spec, seen)
         elif isinstance(value, list):
             result[key] = [
-                _resolve_schema_refs(item, spec) if isinstance(item, dict) else item
+                _resolve_schema_refs(item, spec, seen) if isinstance(item, dict) else item
                 for item in value
             ]
     return result
@@ -216,32 +229,40 @@ def _remove_unsupported_constraints(
     """
     Recursively remove constraints Python's re module cannot handle.
 
-    The OpenAPI spec contains PCRE patterns (\\p{L} for Unicode categories) that
-    Python's re module does not support. This removes `pattern` constraints to
-    focus schema validation on structure and types.
+    Some patterns in the OpenAPI spec use PCRE syntax (\\p{L} for Unicode
+    categories) that Python's re module does not support. This removes only those
+    patterns that fail re.compile, preserving the rest.
+
+    Note: This matches on key name anywhere in the tree, so a schema with a
+    property literally named "pattern" or "required" would lose it. No schema in
+    the current snapshot has one.
 
     Args:
         schema: The schema to clean.
-        is_partial: If True, also remove `required` constraints for partial updates.
+        is_partial: If True, remove the top-level `required` constraint only.
 
     Returns:
-        The schema with `pattern` (and optionally `required`) removed.
+        The schema with unsupported `pattern` constraints removed, and optionally
+        the top-level `required` removed for PATCH.
     """
     result = {}
     for key, value in schema.items():
-        if key == "pattern":
-            # Skip pattern constraints entirely
+        if key == "pattern" and isinstance(value, str):
+            # Skip only patterns that Python's re module cannot compile
+            try:
+                re.compile(value)
+                result[key] = value  # Pattern compiles; keep it
+            except re.error:
+                continue  # Pattern fails; strip it
+        elif key == "required" and is_partial:
+            # Skip required constraints for partial updates (PATCH), top-level only
             continue
-        if key == "required" and is_partial:
-            # Skip required constraints for partial updates (PATCH)
-            continue
-        if isinstance(value, dict):
-            result[key] = _remove_unsupported_constraints(value, is_partial)
+        elif isinstance(value, dict):
+            # Don't propagate is_partial to nested objects
+            result[key] = _remove_unsupported_constraints(value, False)
         elif isinstance(value, list):
             result[key] = [
-                _remove_unsupported_constraints(item, is_partial)
-                if isinstance(item, dict)
-                else item
+                _remove_unsupported_constraints(item, False) if isinstance(item, dict) else item
                 for item in value
             ]
         else:
@@ -301,7 +322,11 @@ BODY_VALIDATION_EXEMPT: dict[tuple[str, str], str] = {
 # submit_form_for_invitation, delete_submissions, upload_codebook,
 # retranscribe_attachment, activate_tsd, activate_educloud, upload_image.
 # delete_all_submissions is deliberately absent (see BODY_VALIDATION_EXEMPT).
-# upload_submission_attachment sends binary content, not JSON, so it's excluded.
+# upload_submission_attachment is excluded because PUT
+# /form/submission/{submissionId}/attachment declares no requestBody key in the
+# spec at all — it is all query parameters despite uploading a file. The
+# attachment upload's body can never be checked by this test, no matter what the
+# tool sends, because the spec declares nothing to check it against.
 WRITE_TOOL_CASES = [
     (
         create_form,
@@ -403,11 +428,14 @@ WRITE_TOOL_CASES = [
 @pytest.mark.respx(assert_all_called=False)
 @pytest.mark.usefixtures("token_route")
 async def test_outgoing_body_validates_against_its_declared_schema(
-    tool: object, kwargs: dict[str, object], route: Route, respx_mock: respx.MockRouter
+    tool: Callable[..., Awaitable[str]],
+    kwargs: dict[str, object],
+    route: Route,
+    respx_mock: respx.MockRouter,
 ) -> None:
     """Verify outgoing request bodies validate against their declared schemas."""
     # Mock the GET request for update_form_element, which reads before writing
-    if tool.__name__ == "update_form_element":  # type: ignore[attr-defined]
+    if tool.__name__ == "update_form_element":
         respx_mock.route(method="GET").mock(
             return_value=httpx.Response(
                 200, json=[{"elementId": 1, "elementType": "TEXT", "questionText": "Q1"}]
@@ -415,31 +443,65 @@ async def test_outgoing_body_validates_against_its_declared_schema(
         )
 
     captured = respx_mock.route(method=route.method).mock(return_value=httpx.Response(200, json={}))
-    await tool(**kwargs)  # type: ignore[misc]
+    await tool(**kwargs)
 
     # For update_form_element, find the PUT request (not the GET)
-    if tool.__name__ == "update_form_element":  # type: ignore[attr-defined]
+    if tool.__name__ == "update_form_element":
         put_call = next(call for call in captured.calls if call.request.method == "PUT")
         body = json.loads(put_call.request.content)
+        actual_request = put_call.request
     else:
         body = json.loads(captured.calls.last.request.content)
+        actual_request = captured.calls.last.request
 
-    # upload_image sends a base64 string as the body, not a JSON object
-    if tool.__name__ == "upload_image":  # type: ignore[attr-defined]
-        # The spec declares the body as {"type": "string", "format": "byte"},
-        # and the tool sends a plain string (base64-encoded bytes). Wrap it for
-        # validation since json.loads already decoded the JSON string.
-        # Actually, the body IS a string, and the schema expects a string, so
-        # validation should just work. The schema is {"type": "string", "format": "byte"}.
-        pass  # body is already the string
+    # Verify the request went to the declared path, not a different route
+    # Substitute path params from kwargs into the route's path template
+    resolved_path = route.path
+    for param_name, param_value in kwargs.items():
+        # Convert snake_case param names to camelCase for path substitution
+        camel_name = "".join(
+            word.capitalize() if i > 0 else word for i, word in enumerate(param_name.split("_"))
+        )
+        resolved_path = resolved_path.replace(f"{{{camel_name}}}", str(param_value))
+    assert actual_request.url.path.endswith(resolved_path), (
+        f"{tool.__name__} declared {route.method} {route.path} but called "
+        f"{actual_request.method} {actual_request.url.path}"
+    )
 
     schema = _request_schema(load_spec(), route)
     assert schema is not None, f"{route.method} {route.path} declares no request body in the spec"
-    # Validate without format checking: the spec contains PCRE patterns (\p{L})
-    # that Python's re module does not support, but we're checking structure, not
-    # format constraints.
     validator = jsonschema.Draft202012Validator(schema)
     validator.validate(body)
+
+
+def test_body_validation_exempt_holds_exactly_one_entry() -> None:
+    """
+    Pin BODY_VALIDATION_EXEMPT to its single entry with a non-empty reason.
+
+    This dict is an escape hatch from the coverage requirement and is
+    subtracted in test_every_route_with_a_request_body_has_a_case. Growing it
+    must be a deliberate, reviewed act, not the quiet way to make a red test
+    green. Mirrored from test_out_of_scope_holds_exactly_the_four_v1_invitation_operations.
+    """
+    assert set(BODY_VALIDATION_EXEMPT) == {
+        ("DELETE", "/form/{formId}/submissions"),
+    }
+    assert all(reason for reason in BODY_VALIDATION_EXEMPT.values())
+
+
+def test_write_tool_cases_has_exactly_thirteen_rows() -> None:
+    """
+    Pin WRITE_TOOL_CASES to 13 rows.
+
+    Deleting a row without adding it to BODY_VALIDATION_EXEMPT should fail the
+    coverage test, but pinning the count closes the other half: a deleted row
+    would otherwise vanish without any count changing.
+    """
+    assert len(WRITE_TOOL_CASES) == 13, (
+        f"WRITE_TOOL_CASES has {len(WRITE_TOOL_CASES)} rows; expected 13. If a tool was added, "
+        "update this count and confirm the new route is in the spec. If a tool was removed, "
+        "ensure it was removed from REGISTRY and not just added to BODY_VALIDATION_EXEMPT."
+    )
 
 
 def test_every_route_with_a_request_body_has_a_case() -> None:

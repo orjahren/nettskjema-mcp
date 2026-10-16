@@ -3,6 +3,8 @@
 import ast
 import inspect
 import json
+import logging
+import sys
 from pathlib import Path
 
 import httpx
@@ -12,10 +14,11 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 import nettskjema_mcp
+from nettskjema_mcp import server as server_module
 from nettskjema_mcp.client import dump
 from nettskjema_mcp.config import reset_settings
 from nettskjema_mcp.routes import LOCAL_TOOLS, REGISTRY
-from nettskjema_mcp.server import bridge_errors, mcp
+from nettskjema_mcp.server import _log_level, bridge_errors, main, mcp, tool
 from nettskjema_mcp.tools.meta import check_auth_status, get_user_info
 from tests.conftest import TEST_BASE_URL
 
@@ -77,6 +80,19 @@ async def test_check_auth_status_is_registered_as_a_local_tool() -> None:
     assert "check_auth_status" not in REGISTRY
 
 
+def _writes_to_stdout(func: ast.expr) -> bool:
+    """
+    Report whether a call target writes to stdout.
+
+    Covers the plain ``print(...)`` anyone leaves behind while debugging, the
+    attribute forms that dodge a bare-name check (``builtins.print``), and
+    direct writes such as ``sys.stdout.write`` — the one a tool streaming a
+    large export might reach for.
+    """
+    target = ast.unparse(func)
+    return target == "print" or target.endswith(".print") or "stdout" in target
+
+
 def test_no_print_calls_in_the_package() -> None:
     """
     Nothing under nettskjema_mcp/ may print.
@@ -89,11 +105,7 @@ def test_no_print_calls_in_the_package() -> None:
     for path in sorted(package_root.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "print"
-            ):
+            if isinstance(node, ast.Call) and _writes_to_stdout(node.func):
                 offenders.append(f"{path.relative_to(package_root)}:{node.lineno}")
 
     assert offenders == []
@@ -138,16 +150,42 @@ async def test_a_typed_error_surfaces_as_a_tool_error(respx_mock: respx.MockRout
     assert "is unknown" in message
 
 
+@pytest.mark.parametrize("mask_error_details", [False, True])
 async def test_a_typed_error_keeps_its_detail_through_the_server(
-    respx_mock: respx.MockRouter,
+    respx_mock: respx.MockRouter, mask_error_details: bool
 ) -> None:
-    """The detail survives FastMCP's own error handling, masked or not."""
-    respx_mock.get(ME_URL).mock(return_value=httpx.Response(404, json={"message": "No such user"}))
+    """
+    The detail survives FastMCP's own error handling, masked or not.
+
+    Both halves of this matter. With masking on, FastMCP replaces an unhandled
+    exception with a bare "Error calling tool", which is the whole argument for
+    wrapping the body instead of using middleware. With masking off it keeps
+    the text but prefixes it — so the assertion is on the exact message, not on
+    a substring: the prefix is what tells us the bridge did not fire.
+    """
+    respx_mock.get(ME_URL).mock(
+        return_value=httpx.Response(
+            400,
+            json={
+                "message": "Validation failed",
+                "errorKeysAndErrorMessages": {
+                    "title": ["must not be blank"],
+                    "elements[2].questionText": ["is too long"],
+                },
+            },
+        )
+    )
+    # A server of its own, because masking is fixed at construction. It serves
+    # the same bridged function the shared server registered.
+    server: FastMCP = FastMCP("masking-probe", mask_error_details=mask_error_details)
+    server.tool(get_user_info, annotations={"readOnlyHint": True})
 
     with pytest.raises(ToolError) as caught:
-        await mcp.call_tool("get_user_info", {})
+        await server.call_tool("get_user_info", {})
 
-    assert "No such user" in str(caught.value)
+    assert str(caught.value) == (
+        "Validation failed\ntitle → must not be blank\nelements[2].questionText → is too long"
+    )
 
 
 async def test_every_registered_tool_goes_through_the_error_bridge() -> None:
@@ -161,13 +199,73 @@ async def test_every_registered_tool_goes_through_the_error_bridge() -> None:
     tools = await mcp.list_tools()
 
     assert tools
-    for tool in tools:
-        fn = getattr(tool, "fn", None)
-        assert fn is not None, f"{tool.name} is not a function tool"
+    for registered in tools:
+        fn = getattr(registered, "fn", None)
+        assert fn is not None, f"{registered.name} is not a function tool"
         assert getattr(fn, "__nettskjema_bridged__", False), (
-            f"{tool.name} was registered without the error bridge; "
-            "use @tool from nettskjema_mcp.server, not @mcp.tool"
+            f"{registered.name} was registered without the error bridge; "
+            "use @tool() from nettskjema_mcp.server, not @mcp.tool"
         )
+
+
+async def test_every_registered_tool_declares_its_routes() -> None:
+    """
+    A tool must say which routes it calls, or say that it calls none.
+
+    REGISTRY is what test_contract.py validates against the vendored OpenAPI
+    spec, so a tool that never lands there ships an unchecked route — which is
+    exactly how the version being replaced ended up with five tools calling
+    endpoints that do not exist.
+    """
+    tools = await mcp.list_tools()
+
+    assert tools
+    for registered in tools:
+        assert registered.name in REGISTRY or registered.name in LOCAL_TOOLS, (
+            f"{registered.name} declares no routes; add @endpoint(ROUTE) below @tool(), "
+            "or add the name to routes.LOCAL_TOOLS if it makes no request"
+        )
+
+
+async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
+    """
+    readOnlyHint must agree with the tool's HTTP methods, in both directions.
+
+    Clients auto-approve a call annotated read-only without asking the user, so
+    the hint on a tool that writes is a safety defect, not a documentation one.
+    The converse is asserted too: a tool that only reads and forgets the hint
+    makes clients prompt for permission it did not need, which trains people to
+    click through the prompts that matter. Tools in LOCAL_TOOLS issue no
+    request at all and are exempt from both directions.
+    """
+    for registered in await mcp.list_tools():
+        routes = REGISTRY.get(registered.name)
+        if registered.name in LOCAL_TOOLS or routes is None:
+            # An undeclared tool is reported by the route test, not twice here.
+            continue
+        annotations = registered.annotations
+        read_only = annotations is not None and annotations.readOnlyHint is True
+        gets_only = all(route.method == "GET" for route in routes)
+
+        if read_only:
+            assert gets_only, (
+                f"{registered.name} is annotated readOnlyHint but calls "
+                f"{sorted({route.method for route in routes})}; clients auto-approve "
+                "read-only tools, so drop the annotation"
+            )
+        else:
+            assert not gets_only, (
+                f"{registered.name} only issues GETs but is not annotated readOnlyHint; "
+                'add annotations={"readOnlyHint": True}'
+            )
+
+
+def test_tool_must_be_called_with_parentheses() -> None:
+    """A bare @tool is the likely first mistake, so it must say what to write."""
+    with pytest.raises(TypeError) as caught:
+        tool(get_user_info)
+
+    assert "@tool()" in str(caught.value)
 
 
 async def test_the_error_bridge_preserves_the_signature_fastmcp_reads() -> None:
@@ -180,9 +278,52 @@ async def test_the_error_bridge_preserves_the_signature_fastmcp_reads() -> None:
     assert inspect.signature(bridged) == inspect.signature(example)
     assert await bridged(1) == dump({"formId": 1, "title": None})
 
-    probe: FastMCP = FastMCP("probe")
+    probe: FastMCP = FastMCP("signature-probe")
     probe.tool(bridged)
     registered = await probe.get_tool("example")
     assert registered is not None
     assert set(registered.parameters["properties"]) == {"form_id", "title"}
     assert registered.parameters["required"] == ["form_id"]
+
+
+@pytest.mark.parametrize(
+    "configured,expected",
+    [
+        ("debug", logging.DEBUG),
+        ("WARNING", logging.WARNING),
+        (" info ", logging.INFO),
+        ("nonsense", logging.INFO),
+        ("", logging.INFO),
+    ],
+)
+def test_log_level_resolves_the_configured_name(configured: str, expected: int) -> None:
+    """An unknown level name must not crash the server on startup."""
+    assert _log_level(configured) == expected
+
+
+def test_main_configures_stderr_logging_before_running(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Logging goes to stderr, at the configured level, and the server then runs.
+
+    stdout is the JSON-RPC channel: a log handler pointed at it would corrupt
+    every session. basicConfig() is a no-op once the root logger has a handler,
+    so the root logger is emptied first to see what main() actually installs.
+    """
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setattr(root, "level", logging.WARNING)
+    # Real dotenv loading would read whatever .env file sits above the worktree.
+    loaded: list[str] = []
+    monkeypatch.setattr(server_module, "load_dotenv", lambda: loaded.append("load_dotenv"))
+    monkeypatch.setattr(mcp, "run", lambda: loaded.append("run"))
+    monkeypatch.setenv("NETTSKJEMA_LOG_LEVEL", "DEBUG")
+    reset_settings()
+
+    main()
+
+    assert loaded == ["load_dotenv", "run"], "the .env file must be read before the server starts"
+    assert root.level == logging.DEBUG
+    assert len(root.handlers) == 1
+    handler = root.handlers[0]
+    assert isinstance(handler, logging.StreamHandler)
+    assert handler.stream is sys.stderr

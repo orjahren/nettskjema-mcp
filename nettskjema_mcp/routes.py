@@ -51,7 +51,11 @@ def endpoint(*routes: Route) -> Callable[[F], F]:
     """
     Register routes for a tool function.
 
-    Must be applied below @mcp.tool so it sees the undecorated function name.
+    By convention it is applied directly below @tool (from
+    nettskjema_mcp.server), so every tool module reads the same way. The order
+    is not load-bearing: the error bridge wraps the function with
+    functools.wraps, so the name is preserved either way.
+
     Duplicate registration of the same tool name raises ValueError.
 
     Args:

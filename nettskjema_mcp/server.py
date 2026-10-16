@@ -9,7 +9,7 @@ import functools
 import logging
 import sys
 from collections.abc import Awaitable, Callable
-from typing import TypeVar, cast
+from typing import ParamSpec
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -22,8 +22,11 @@ logger = logging.getLogger(__name__)
 mcp: FastMCP = FastMCP("nettskjema")
 
 # Every tool is an async function answering with a string: a tool result is
-# text, and the client renders whatever we hand back.
-ToolFunction = TypeVar("ToolFunction", bound=Callable[..., Awaitable[str]])
+# text, and the client renders whatever we hand back. The ParamSpec carries the
+# tool's own parameters through the bridge, so the wrapper keeps the signature
+# FastMCP reads — and its forwarding is type-checked too.
+P = ParamSpec("P")
+ToolFunction = Callable[P, Awaitable[str]]
 
 # Marks a function as having been wrapped by bridge_errors. A contract test
 # asserts it on every registered tool, so a tool registered with a bare
@@ -34,7 +37,7 @@ BRIDGED_ATTRIBUTE = "__nettskjema_bridged__"
 DEFAULT_LOG_LEVEL = logging.INFO
 
 
-def bridge_errors(fn: ToolFunction) -> ToolFunction:
+def bridge_errors(fn: ToolFunction[P]) -> ToolFunction[P]:
     """
     Wrap a tool so its typed errors reach the model as MCP tool errors.
 
@@ -56,19 +59,19 @@ def bridge_errors(fn: ToolFunction) -> ToolFunction:
     """
 
     @functools.wraps(fn)
-    async def bridged(*args: object, **kwargs: object) -> str:
+    async def bridged(*args: P.args, **kwargs: P.kwargs) -> str:
         try:
             return await fn(*args, **kwargs)
         except NettskjemaError as exc:
             raise to_tool_error(exc) from exc
 
     setattr(bridged, BRIDGED_ATTRIBUTE, True)
-    # functools.wraps keeps the signature FastMCP reads, but the wrapper's own
-    # (*args, **kwargs) type cannot express that, so the cast restores it.
-    return cast(ToolFunction, bridged)
+    return bridged
 
 
-def tool(*, annotations: dict[str, bool] | None = None) -> Callable[[ToolFunction], ToolFunction]:
+def tool(
+    *args: object, annotations: dict[str, bool] | None = None
+) -> Callable[[ToolFunction[P]], ToolFunction[P]]:
     """
     Register a tool with the shared server, through the error bridge.
 
@@ -76,15 +79,28 @@ def tool(*, annotations: dict[str, bool] | None = None) -> Callable[[ToolFunctio
     errors are translated. The decorated name stays a plain coroutine function,
     so a tool can be called — and tested — directly.
 
+    Must be called, even with no annotations: ``@tool()``. ``@mcp.tool`` works
+    bare, so the positional guard below turns the likely first mistake into a
+    message that says what to write instead.
+
     Args:
+        *args: Not accepted. Present only to diagnose a bare ``@tool``.
         annotations: MCP tool annotations. Pass ``{"readOnlyHint": True}`` for
-            a tool that only reads.
+            a tool that only reads. A tool annotated read-only may only hold
+            GET routes, and a contract test enforces that.
 
     Returns:
         A decorator registering the function and returning the bridged wrapper.
-    """
 
-    def decorator(fn: ToolFunction) -> ToolFunction:
+    Raises:
+        TypeError: If applied as a bare ``@tool`` rather than ``@tool()``.
+    """
+    if args:
+        raise TypeError(
+            "@tool must be called: write @tool() or @tool(annotations={...}), not @tool."
+        )
+
+    def decorator(fn: ToolFunction[P]) -> ToolFunction[P]:
         bridged = bridge_errors(fn)
         mcp.tool(bridged, annotations=annotations)
         return bridged

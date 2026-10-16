@@ -28,7 +28,7 @@ SUBMISSION = {
 MY_SUBMISSIONS = [
     {
         "submissionId": 1,
-        "form": {"formId": 1, "title": "Test Form"},
+        "form": {"title": "Test Form"},
         "createdDate": "2024-01-01T00:00:00Z",
         "modifiedDate": "2024-01-01T00:00:00Z",
         "delivered": True,
@@ -224,3 +224,56 @@ async def test_postponed_metadata_with_query_parameters(respx_mock: respx.MockRo
 
     assert route.call_count == 1
     assert str(route.calls.last.request.url) == url
+
+
+async def test_submission_metadata_exactly_max_rows_not_truncated(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """get_submission_metadata() with exactly max_rows rows reports truncated=false."""
+    url = f"{TEST_BASE_URL}/form/123/submission-metadata"
+    # Exactly 3 rows, max_rows=3
+    ndjson_content = (
+        "\n".join([f'{{"submissionId": {i}, "formId": 123}}' for i in range(1, 4)]) + "\n"
+    )
+    route = respx_mock.get(url).mock(
+        return_value=httpx.Response(
+            200,
+            content=ndjson_content,
+            headers={"content-type": "application/x-ndjson"},
+        )
+    )
+
+    result = await get_submission_metadata(123, max_rows=3)
+
+    assert route.call_count == 1
+    parsed = json.loads(result)
+    assert parsed["rowCount"] == 3
+    assert parsed["truncated"] is False
+    assert parsed["reason"] is None
+
+
+async def test_get_submission_pdf_relative_path_resolved_to_absolute(
+    respx_mock: respx.MockRouter, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """get_submission_pdf() with relative output_path returns an absolute path."""
+    url = f"{TEST_BASE_URL}/form/submission/123/pdf"
+    pdf_content = b"%PDF-1.4\ntest pdf content"
+    route = respx_mock.get(url).mock(
+        return_value=httpx.Response(
+            200,
+            content=pdf_content,
+            headers={"content-type": "application/pdf"},
+        )
+    )
+
+    # Change to tmp_path so relative paths resolve there
+    monkeypatch.chdir(tmp_path)
+    result = await get_submission_pdf(123, output_path="relative.pdf")
+
+    assert route.call_count == 1
+    parsed = json.loads(result)
+    returned_path = Path(parsed["path"])
+    assert returned_path.is_absolute()
+    assert returned_path.name == "relative.pdf"
+    assert returned_path.exists()
+    assert returned_path.read_bytes() == pdf_content

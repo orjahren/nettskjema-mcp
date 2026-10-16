@@ -260,15 +260,22 @@ class NettskjemaClient:
             route: The route to call.
             path: Values for the route's path placeholders.
             query: Query parameters; entries whose value is None are dropped.
-            max_rows: Row cap. Defaults to ``settings.max_answer_rows``.
+            max_rows: Row cap. Defaults to ``settings.max_answer_rows``. Must be at
+                least 1 when provided.
 
         Returns:
             ``{"rows": [...], "rowCount": int, "truncated": bool, "reason": str | None}``.
 
         Raises:
+            BadRequestError: If max_rows is less than 1.
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
             UpstreamError: If the connection fails while the body is streaming.
         """
+        if max_rows is not None and max_rows < 1:
+            raise BadRequestError(
+                f"max_rows must be at least 1, got {max_rows}. "
+                "To retrieve all rows, omit max_rows or set it to a large value."
+            )
         cap = max_rows if max_rows is not None else self._settings.max_answer_rows
         request = await self._build_request(
             route, path, query, accept="application/x-ndjson, application/json"
@@ -618,13 +625,13 @@ def _validate_output_path(output_path: str) -> Path:
         output_path: The requested destination.
 
     Returns:
-        The resolved destination path.
+        The resolved, absolute destination path.
 
     Raises:
         BadRequestError: If the parent is missing, is not a directory, is not
             writable, or the destination itself is a directory.
     """
-    target = Path(output_path).expanduser()
+    target = Path(output_path).expanduser().resolve()
     parent = target.parent
     if not parent.is_dir():
         raise BadRequestError(

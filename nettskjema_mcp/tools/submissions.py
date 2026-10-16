@@ -35,8 +35,8 @@ async def list_my_submissions() -> str:
 
     Returns:
         An array of submission summary objects as JSON. Each object includes
-        submissionId, form (with formId and title), createdDate, modifiedDate, and
-        delivered (boolean).
+        submissionId, form (with title), createdDate, modifiedDate, and delivered
+        (boolean).
     """
     return dump(await get_client().json(LIST_MY_SUBMISSIONS))
 
@@ -47,15 +47,21 @@ async def get_submission_pdf(submission_id: int, output_path: str | None = None)
     """
     Download a submission as a PDF file.
 
-    The PDF is written to disk, not returned inline: a multi-megabyte workbook as
+    The PDF is written to disk, not returned inline: a multi-megabyte PDF as
     base64 is not useful to a model. The returned path is absolute and
     tilde-expanded. An existing file at the output path is silently overwritten.
+
+    When output_path is omitted, a temporary file is created in the system temp
+    directory with a .pdf suffix and mode 0600 (readable only by the current user).
+    The temporary file persists after this call returns and is left on disk for the
+    caller to use or delete.
 
     Args:
         submission_id: The submission's numeric ID.
         output_path: Destination file path. When omitted, a temporary file is
-            created in the system temp directory with a .pdf suffix. The path may
-            contain ~ for the home directory.
+            created in the system temp directory. The path may contain ~ for the
+            home directory and may be relative (it will be resolved to an absolute
+            path).
 
     Returns:
         A JSON object with path (the absolute path to the written file), bytes
@@ -78,24 +84,27 @@ async def get_submission_metadata(
     max_rows: int | None = None,
 ) -> str:
     """
-    Stream submission metadata for a form, as newline-delimited JSON.
+    Stream all submission metadata for a form, as newline-delimited JSON.
 
     Returns metadata without answers: use this for bulk export of submission-level
     fields or to find which submissions exist before fetching their answers. This
     streams NDJSON (one JSON object per line), so a large form's metadata is never
-    held whole in memory. The result is capped at max_rows (default 1000) to bound
-    context size: check the returned truncated field to see if more data exists.
+    held whole in memory. The result is capped at max_rows to bound context size:
+    check the returned truncated field to see if more data exists.
 
-    Distinct from get_postponed_submission_metadata: this endpoint returns metadata
-    for delivered (non-postponed) submissions.
+    Distinct from get_postponed_submission_metadata, which returns postponed
+    submission metadata only. The relationship between the two result sets (whether
+    this endpoint includes or excludes postponed submissions) is not specified by
+    the API documentation.
 
     Args:
         form_id: The form's numeric ID.
         submission_ids_greater_than: Only include submissions with IDs above this value.
         optimize_for_large_data: Request optimization for large datasets.
-        max_rows: Maximum number of rows to return. Defaults to the server's
+        max_rows: Maximum number of rows to return. Defaults to this MCP server's
             configured limit (1000). When the cap is reached, truncated is set to
-            true and reason is "rowCap".
+            true and reason is "rowCap". The caller may raise this limit arbitrarily
+            by passing a larger value.
 
     Returns:
         A JSON object with rows (an array of SubmissionMetadataDTO objects),
@@ -128,20 +137,20 @@ async def get_postponed_submission_metadata(
     """
     Stream postponed submission metadata for a form, as newline-delimited JSON.
 
-    Postponed submissions are those that have been started but not delivered. This
-    endpoint returns the same metadata structure as get_submission_metadata, but
-    only for postponed submissions. The result is streamed as NDJSON and capped at
-    max_rows (default 1000).
+    This endpoint returns the same metadata structure as get_submission_metadata,
+    but only for postponed submissions. The result is streamed as NDJSON and capped
+    at max_rows to bound context size.
 
-    Distinct from get_submission_metadata: this endpoint returns metadata only for
-    postponed (non-delivered) submissions, while that one returns delivered submissions.
+    Distinct from get_submission_metadata: this endpoint returns postponed submission
+    metadata only, while that one returns all submission metadata for the form.
 
     Args:
         form_id: The form's numeric ID.
         submission_ids_greater_than: Only include submissions with IDs above this value.
-        max_rows: Maximum number of rows to return. Defaults to the server's
+        max_rows: Maximum number of rows to return. Defaults to this MCP server's
             configured limit (1000). When the cap is reached, truncated is set to
-            true and reason is "rowCap".
+            true and reason is "rowCap". The caller may raise this limit arbitrarily
+            by passing a larger value.
 
     Returns:
         A JSON object with rows (an array of SubmissionMetadataDTO objects),

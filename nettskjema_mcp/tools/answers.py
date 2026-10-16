@@ -34,9 +34,10 @@ async def get_form_answers(
         submission_ids_greater_than: Only include answers from submissions with
             IDs above this value.
         optimize_for_large_data: Request optimization for large datasets.
-        max_rows: Maximum number of rows to return. Defaults to the server's
+        max_rows: Maximum number of rows to return. Defaults to this MCP server's
             configured limit (1000). When the cap is reached, truncated is set to
-            true and reason is "rowCap".
+            true and reason is "rowCap". The caller may raise this limit arbitrarily
+            by passing a larger value.
 
     Returns:
         A JSON object with rows (an array of AnswerDTO objects), rowCount (the
@@ -44,7 +45,8 @@ async def get_form_answers(
         row includes answerId, submissionId, formId, elementId, subElementId,
         elementType, textAnswer, answerOptionIds, externalElementId,
         externalAnswerOptionIds, correct, createdDate, modifiedDate, attachment
-        (boolean), answerAttachmentId, filename, mediaType, and size.
+        (an AnswerAttachmentDTO object with answerAttachmentId, filename, mediaType,
+        and size), answerAttachmentId, filename, mediaType, and size.
     """
     return dump(
         await get_client().ndjson(

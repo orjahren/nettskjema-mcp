@@ -140,3 +140,49 @@ async def test_get_form_answers_without_optional_params(respx_mock: respx.MockRo
 
     assert route.call_count == 1
     assert route.calls.last.request.url == url
+
+
+async def test_get_form_answers_rejects_max_rows_less_than_one(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """get_form_answers() rejects max_rows < 1 with ToolError (from BadRequestError)."""
+    from fastmcp.exceptions import ToolError
+
+    with pytest.raises(ToolError) as exc_info:
+        await get_form_answers(123, max_rows=0)
+
+    assert "max_rows must be at least 1" in str(exc_info.value)
+    assert "got 0" in str(exc_info.value)
+
+    with pytest.raises(ToolError) as exc_info:
+        await get_form_answers(123, max_rows=-5)
+
+    assert "max_rows must be at least 1" in str(exc_info.value)
+    assert "got -5" in str(exc_info.value)
+
+
+async def test_get_form_answers_exactly_max_rows_not_truncated(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """get_form_answers() with exactly max_rows rows reports truncated=false."""
+    url = f"{TEST_BASE_URL}/form/123/answers"
+    # Exactly 5 rows, max_rows=5
+    ndjson_content = (
+        "\n".join([f'{{"answerId": {i}, "elementId": 1, "formId": 123}}' for i in range(1, 6)])
+        + "\n"
+    )
+    route = respx_mock.get(url).mock(
+        return_value=httpx.Response(
+            200,
+            content=ndjson_content,
+            headers={"content-type": "application/x-ndjson"},
+        )
+    )
+
+    result = await get_form_answers(123, max_rows=5)
+
+    assert route.call_count == 1
+    parsed = json.loads(result)
+    assert parsed["rowCount"] == 5
+    assert parsed["truncated"] is False
+    assert parsed["reason"] is None

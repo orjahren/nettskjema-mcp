@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-from nettskjema_mcp.client import get_client, reset_client
+from nettskjema_mcp.client import reset_client
 from nettskjema_mcp.config import get_settings, reset_settings
 
 # Pinned test environment hosts (not configurable from environment)

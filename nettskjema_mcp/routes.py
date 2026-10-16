@@ -62,16 +62,16 @@ ERROR_BODY_EXEMPT: dict[Route, str] = {
 # Out-of-scope routes with reasons for exclusion
 OUT_OF_SCOPE: dict[tuple[str, str], str] = {
     ("GET", "/form/{formId}/invitations"): (
-        "v1 invitation management; v2 is the supported surface and is private"
+        "v1 invitation management; v2 is private — handle invitation creation in the frontend"
     ),
     ("POST", "/form/{formId}/invitations"): (
-        "v1 invitation management; v2 is the supported surface and is private"
+        "v1 invitation management; v2 is private — handle invitation creation in the frontend"
     ),
     ("DELETE", "/form/{formId}/invitations"): (
-        "v1 invitation management; v2 is the supported surface and is private"
+        "v1 invitation management; v2 is private — handle invitation deletion in the frontend"
     ),
     ("DELETE", "/form/{formId}/invitation"): (
-        "v1 invitation management; v2 is the supported surface and is private"
+        "v1 invitation management; v2 is private — handle invitation deletion in the frontend"
     ),
 }
 

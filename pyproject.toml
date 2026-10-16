@@ -49,8 +49,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["nettskjema_mcp"]
 
-# [tool.hatch.build.targets.wheel.force-include]
-# "spec/openapi.json" = "nettskjema_mcp/spec/openapi.json"
+[tool.hatch.build.targets.wheel.force-include]
+"nettskjema_mcp/spec/openapi.json" = "nettskjema_mcp/spec/openapi.json"
 
 [project.scripts]
 nettskjema-mcp = "nettskjema_mcp:main"

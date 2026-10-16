@@ -1,0 +1,3871 @@
+{
+  "components": {
+    "schemas": {
+      "ActivateFormDTO": {
+        "properties": {
+          "projectName": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AnswerAttachmentDTO": {
+        "properties": {
+          "answerAttachmentId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "AnswerDTO": {
+        "properties": {
+          "answerAttachmentId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "answerId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "answerOptionIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "attachment": {
+            "$ref": "#/components/schemas/AnswerAttachmentDTO"
+          },
+          "correct": {
+            "type": "boolean"
+          },
+          "createdDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "elementId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "elementType": {
+            "type": "string"
+          },
+          "externalAnswerOptionIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "externalElementId": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "formId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "modifiedDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "subElementId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "submissionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "textAnswer": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AnswerOptionDTO": {
+        "properties": {
+          "additionalRecipientEmail": {
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 0,
+            "type": "string"
+          },
+          "altText": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          },
+          "answerOptionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "externalAnswerOptionId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "externalElementId": {
+            "type": "string"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageDTO"
+          },
+          "imageAlignment": {
+            "enum": [
+              "LEFT",
+              "CENTER",
+              "RIGHT"
+            ],
+            "type": "string"
+          },
+          "imageSize": {
+            "enum": [
+              "SMALL",
+              "MEDIUM",
+              "LARGE"
+            ],
+            "type": "string"
+          },
+          "imageUrl": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "integrationTags": {
+            "type": "string"
+          },
+          "isCorrect": {
+            "type": "boolean"
+          },
+          "isPreselected": {
+            "type": "boolean"
+          },
+          "redirectToForm": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sequence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 700,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AuthorizationDetails": {
+        "properties": {
+          "name_authorizer": {
+            "type": "string"
+          },
+          "pid_authorizer": {
+            "type": "string"
+          },
+          "representation_type": {
+            "enum": [
+              "UNKNOWN",
+              "SELF",
+              "PARENT",
+              "AUTHORITY"
+            ],
+            "type": "string"
+          },
+          "representative_name": {
+            "type": "string"
+          },
+          "representative_pid": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ClientAnswerDTO": {
+        "properties": {
+          "answerId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "answerOptionIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "answered": {
+            "type": "boolean"
+          },
+          "date": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "datetime": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "ids": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "questionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          },
+          "time": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "SINGLE_OPTION",
+              "MULTIPLE_OPTIONS",
+              "TEXT",
+              "FILE",
+              "DATE_TIME",
+              "DATE",
+              "TIME",
+              "NOT_PROVIDED"
+            ],
+            "type": "string"
+          },
+          "unAnswered": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "CodebookDTO": {
+        "properties": {
+          "answerOptionIdsAndExternalAnswerOptionIdsMap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "elementIdsAndExternalElementIdsMap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "subElementIdsAndExternalElementIdsMap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "answerOptionIdsAndExternalAnswerOptionIdsMap",
+          "elementIdsAndExternalElementIdsMap",
+          "subElementIdsAndExternalElementIdsMap"
+        ],
+        "type": "object"
+      },
+      "CreateFormSettingsDTO": {
+        "properties": {
+          "afterDeliveryForwardFormIds": {
+            "maxLength": 200,
+            "minLength": 0,
+            "pattern": "^(([0-9]+)(,[0-9]+)*)?$",
+            "type": "string"
+          },
+          "automaticReminderIntervalInDays": {
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "canNotAnswerMessage": {
+            "type": "string"
+          },
+          "codebookActivated": {
+            "type": "boolean"
+          },
+          "collectsPersonalData": {
+            "type": "boolean"
+          },
+          "consentForm": {
+            "type": "boolean"
+          },
+          "deleteSubmissionsAfterNumberOfDays": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "editors": {
+            "items": {
+              "$ref": "#/components/schemas/PersonDTO"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "editorsContactEmail": {
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 0,
+            "type": "string"
+          },
+          "editorsContactUrl": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "editorsSubmissionEmailType": {
+            "enum": [
+              "NONE",
+              "MESSAGE",
+              "SUBMISSION"
+            ],
+            "type": "string"
+          },
+          "editorsSubmissionEmails": {
+            "type": "string"
+          },
+          "emailInvitationText": {
+            "type": "string"
+          },
+          "emailReminderText": {
+            "type": "string"
+          },
+          "formType": {
+            "enum": [
+              "DEFAULT",
+              "HIGH_SECURITY",
+              "SIGN_UP",
+              "MULTIPLE_CHOICE",
+              "COURSE_EVALUATION"
+            ],
+            "type": "string"
+          },
+          "globalCopyPermissionEnabled": {
+            "type": "boolean"
+          },
+          "integrationTags": {
+            "type": "string"
+          },
+          "isDictaphone": {
+            "type": "boolean"
+          },
+          "languageCode": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxSubmissionsForm": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxSubmissionsPerson": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "netgroupsEditor": {
+            "items": {
+              "$ref": "#/components/schemas/NetgroupDTO"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "netgroupsWithCopyPermission": {
+            "items": {
+              "$ref": "#/components/schemas/NetgroupDTO"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "offeringReceiptToRespondent": {
+            "type": "boolean"
+          },
+          "personalDataPurposeDescription": {
+            "type": "string"
+          },
+          "personalDataPurposeTypes": {
+            "items": {
+              "enum": [
+                "STUDY_OR_EDUCATION",
+                "EMPLOYEE",
+                "RESEARCH",
+                "OTHER"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "personalDataSharedOutsideInstitutionWith": {
+            "type": "string"
+          },
+          "personsWithCopyPermission": {
+            "items": {
+              "$ref": "#/components/schemas/PersonDTO"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "postponable": {
+            "type": "boolean"
+          },
+          "randomizedOrder": {
+            "type": "boolean"
+          },
+          "receiptText": {
+            "type": "string"
+          },
+          "recurringInvitationIntervalInDays": {
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "recurringInvitationNumber": {
+            "format": "int32",
+            "minimum": 2,
+            "type": "integer"
+          },
+          "respondentGroup": {
+            "enum": [
+              "ALL",
+              "FEIDE",
+              "FEIDE_AND_EDUGAIN",
+              "INVITED",
+              "INVITED_CHAINED_SIGNING",
+              "ID_PORTEN_LEVEL_3",
+              "ID_PORTEN_LEVEL_4",
+              "ID_PORTEN_LEVEL_3_SIGNING",
+              "ID_PORTEN_LEVEL_4_SIGNING",
+              "HELSENORGE",
+              "HELSENORGE_SIGNING"
+            ],
+            "type": "string"
+          },
+          "retainRespondentAccessAfterDelivery": {
+            "type": "boolean"
+          },
+          "scoreResultDisplayType": {
+            "enum": [
+              "NONE",
+              "SCORE_ONLY",
+              "FULL_SOLUTION_AND_SCORE",
+              "ONLY_CHECK_ANSWER"
+            ],
+            "type": "string"
+          },
+          "sendingReceiptToRespondent": {
+            "type": "boolean"
+          },
+          "sensitivePersonalDataCollected": {
+            "type": "boolean"
+          },
+          "shouldHideProgressBar": {
+            "type": "boolean"
+          },
+          "title": {
+            "maxLength": 130,
+            "minLength": 0,
+            "pattern": "^[#\\`\\'\"\\=\\!\\&\\+\\{\\}\\[\\]\\*\\;\\:\\(\\)\\/\\.\\,\\?_«»¿¡€¢–\\-\"\\@\\d\\s\\p{L}]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collectsPersonalData",
+          "formType",
+          "languageCode",
+          "respondentGroup",
+          "sensitivePersonalDataCollected",
+          "title"
+        ],
+        "type": "object"
+      },
+      "CreateInvitationResult": {
+        "properties": {
+          "failedInviteCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "invitationErrors": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorMessageAndInvalidAddresses"
+            },
+            "type": "array"
+          },
+          "successInviteCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalInviteCount": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DeliverMetadataDTO": {
+        "properties": {
+          "elapsedTime": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tsdRespondent": {
+            "$ref": "#/components/schemas/TsdRespondent"
+          }
+        },
+        "type": "object"
+      },
+      "DeliverSubmissionDTO": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/ClientAnswerDTO"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/DeliverMetadataDTO"
+          }
+        },
+        "type": "object"
+      },
+      "ElementDTO": {
+        "properties": {
+          "altText": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          },
+          "answerOptions": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerOptionDTO"
+            },
+            "type": "array"
+          },
+          "answerOptionsVisibilityFilter": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerOptionDTO"
+            },
+            "type": "array"
+          },
+          "dateFormat": {
+            "enum": [
+              "DATE",
+              "DATE_TIME",
+              "TIME"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "elementId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "elementType": {
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "HEADING",
+              "PAGE_BREAK",
+              "ACCORDION",
+              "RADIO",
+              "SELECT",
+              "CHECKBOX",
+              "MATRIX_RADIO",
+              "MATRIX_CHECKBOX",
+              "DATE",
+              "NAME",
+              "PHONE",
+              "EMAIL",
+              "NUMBER",
+              "QUESTION",
+              "USERNAME",
+              "ATTACHMENT",
+              "LINEAR_SCALE",
+              "NATIONAL_ID_NUMBER",
+              "QUESTION_MULTILINE",
+              "SUBMISSION_REFERENCE"
+            ],
+            "type": "string"
+          },
+          "externalElementId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageDTO"
+          },
+          "imageAlignment": {
+            "enum": [
+              "LEFT",
+              "CENTER",
+              "RIGHT"
+            ],
+            "type": "string"
+          },
+          "imageSize": {
+            "enum": [
+              "SMALL",
+              "MEDIUM",
+              "LARGE"
+            ],
+            "type": "string"
+          },
+          "imageUrl": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "isAnswerHashed": {
+            "type": "boolean"
+          },
+          "isAutofill": {
+            "type": "boolean"
+          },
+          "isHorizontal": {
+            "type": "boolean"
+          },
+          "isMandatory": {
+            "type": "boolean"
+          },
+          "isRandomizedOrder": {
+            "type": "boolean"
+          },
+          "isRangeMarksShown": {
+            "type": "boolean"
+          },
+          "isReadOnly": {
+            "type": "boolean"
+          },
+          "linearScaleType": {
+            "enum": [
+              "NONE",
+              "START_END",
+              "START_MID_END",
+              "TEXT_AND_NUM",
+              "ALL"
+            ],
+            "type": "string"
+          },
+          "maxNumberOfCharacters": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxSelectedAnswerOptions": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maximumValue": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "maximumValueText": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          },
+          "midValueText": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "minimumValue": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "minimumValueText": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          },
+          "nationalIdNumberOfDigits": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "nationalIdNumberOfLetters": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "nationalIdNumberType": {
+            "enum": [
+              "ONLY_NUMBERS",
+              "NORWEGIAN_ID_NUMBER",
+              "CUSTOM"
+            ],
+            "type": "string"
+          },
+          "numberOfDecimals": {
+            "format": "int32",
+            "maximum": 3,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "questionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "repeatedNationalIdRequired": {
+            "type": "boolean"
+          },
+          "routingReferenceIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "sendAdditionalRecipientEmail": {
+            "type": "boolean"
+          },
+          "sequence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "subElements": {
+            "items": {
+              "$ref": "#/components/schemas/SubElementDTO"
+            },
+            "type": "array"
+          },
+          "text": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "useForRedirectToForm": {
+            "type": "boolean"
+          },
+          "validationScripts": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationScriptDTO"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "elementType"
+        ],
+        "type": "object"
+      },
+      "ErrorMessage": {
+        "properties": {
+          "confirmForceCleanupErrors": {
+            "$ref": "#/components/schemas/MultiValueMapStringString"
+          },
+          "errors": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "properties": {
+              "all": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object",
+                "writeOnly": true
+              },
+              "empty": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorMessageAndInvalidAddresses": {
+        "properties": {
+          "errorAddresses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormCollectPersonalDataDTO": {
+        "properties": {
+          "deliveryDestination": {
+            "type": "string"
+          },
+          "editors": {
+            "items": {
+              "$ref": "#/components/schemas/PersonDTO"
+            },
+            "type": "array"
+          },
+          "formId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastSubmissionDate": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "numberOfDeliveredSubmissions": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "openFrom": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "openTo": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "personalDataPurposeDescription": {
+            "type": "string"
+          },
+          "personalDataSharedOutsideWith": {
+            "type": "string"
+          },
+          "purposes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "respondentGroup": {
+            "type": "string"
+          },
+          "sensitivePersonalDataCollected": {
+            "type": "boolean"
+          },
+          "theme": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "units": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "FormDefinitionAnswerOptionDTO": {
+        "properties": {
+          "answerOptionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "externalAnswerOptionId": {
+            "type": "string"
+          },
+          "imageDTO": {
+            "$ref": "#/components/schemas/ImageDTO"
+          },
+          "redirectToForm": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sequence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormDefinitionAnswerOptionsVisibilityFilterDTO": {
+        "properties": {
+          "answerOptionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "externalAnswerOptionId": {
+            "type": "string"
+          },
+          "externalElementId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormDefinitionDTO": {
+        "properties": {
+          "afterDeliveryForwardFormIds": {
+            "type": "string"
+          },
+          "collectsPersonalData": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/PersonDTO"
+          },
+          "createdDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "deliveryDestination": {
+            "enum": [
+              "DATABASE",
+              "DATABASE_ENCRYPTED",
+              "EDUCLOUD",
+              "TSD"
+            ],
+            "type": "string"
+          },
+          "editors": {
+            "items": {
+              "$ref": "#/components/schemas/PersonDTO"
+            },
+            "type": "array"
+          },
+          "editorsContactEmail": {
+            "type": "string"
+          },
+          "editorsContactUrl": {
+            "type": "string"
+          },
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/FormDefinitionElementDTO"
+            },
+            "type": "array"
+          },
+          "formId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "formType": {
+            "enum": [
+              "DEFAULT",
+              "HIGH_SECURITY",
+              "SIGN_UP",
+              "MULTIPLE_CHOICE",
+              "COURSE_EVALUATION"
+            ],
+            "type": "string"
+          },
+          "generatedDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "isConsentForm": {
+            "type": "boolean"
+          },
+          "isSensitivePersonalDataCollected": {
+            "type": "boolean"
+          },
+          "languageCode": {
+            "type": "string"
+          },
+          "maxSubmissionsForm": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "modifiedBy": {
+            "$ref": "#/components/schemas/PersonDTO"
+          },
+          "modifiedDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "netgroupsEditor": {
+            "items": {
+              "$ref": "#/components/schemas/NetgroupDTO"
+            },
+            "type": "array"
+          },
+          "netgroupsWithCopyPermission": {
+            "items": {
+              "$ref": "#/components/schemas/NetgroupDTO"
+            },
+            "type": "array"
+          },
+          "openFrom": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "openTo": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "personalDataPurposeDescription": {
+            "type": "string"
+          },
+          "personalDataSharedOutsideInstitutionWith": {
+            "type": "string"
+          },
+          "personsWithCopyPermission": {
+            "items": {
+              "$ref": "#/components/schemas/PersonDTO"
+            },
+            "type": "array"
+          },
+          "respondentGroup": {
+            "enum": [
+              "ALL",
+              "FEIDE",
+              "FEIDE_AND_EDUGAIN",
+              "INVITED",
+              "INVITED_CHAINED_SIGNING",
+              "ID_PORTEN_LEVEL_3",
+              "ID_PORTEN_LEVEL_4",
+              "ID_PORTEN_LEVEL_3_SIGNING",
+              "ID_PORTEN_LEVEL_4_SIGNING",
+              "HELSENORGE",
+              "HELSENORGE_SIGNING"
+            ],
+            "type": "string"
+          },
+          "theme": {
+            "enum": [
+              "DEFAULT",
+              "ABELHEALTH",
+              "AHO",
+              "ANSGAR",
+              "BARNEVERN_NOTODDEN",
+              "BARRATTDUE",
+              "BBJ",
+              "BGO",
+              "BI",
+              "DATATILSYNET",
+              "DMMH",
+              "DNVA",
+              "EDUCLOUD",
+              "EDUCSC",
+              "FHI",
+              "FMI",
+              "FYLKESBIBLIOTEKETABO",
+              "GATEJURISTENTROMSO",
+              "HELSEDIREKTORATET",
+              "HELSE_STAVANGER",
+              "HFY",
+              "HIOF",
+              "HIMOLDE",
+              "HIVOLDA",
+              "HLSENTERET",
+              "HK",
+              "INN",
+              "ISF",
+              "KHIO",
+              "KIRKENSBYMISJON",
+              "KRUS",
+              "KULTURAKADEMIET",
+              "LANDBRUKSDIREKTORATET",
+              "LDH",
+              "MF",
+              "MOBA",
+              "NHH",
+              "NIFU",
+              "NIH",
+              "NKVTS",
+              "NLA",
+              "NMBU",
+              "NMH",
+              "NOKUT",
+              "NORCE",
+              "NORD",
+              "NORDKAPP_KOMMUNE",
+              "NORDLANDSFORSKNING",
+              "NTNU",
+              "NTNU_SAMFORSK",
+              "NUBU",
+              "OSLOMET",
+              "OSLONH",
+              "OUS",
+              "PHS",
+              "RADICH",
+              "RBUP",
+              "SAMAS",
+              "SIKT",
+              "SINTEF",
+              "SSHF",
+              "SYKEHUSET_INNLANDET",
+              "UIA",
+              "UIB",
+              "UIS",
+              "UIT",
+              "UNIS",
+              "USN",
+              "VESTFOLDFYLKE",
+              "VESTRE_VIKEN",
+              "VETINST",
+              "VID",
+              "NOLOGO"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "titleShort": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "versionMinor": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "FormDefinitionElementDTO": {
+        "properties": {
+          "altText": {
+            "type": "string"
+          },
+          "answerOptions": {
+            "items": {
+              "$ref": "#/components/schemas/FormDefinitionAnswerOptionDTO"
+            },
+            "type": "array"
+          },
+          "answerOptionsVisibilityFilter": {
+            "items": {
+              "$ref": "#/components/schemas/FormDefinitionAnswerOptionsVisibilityFilterDTO"
+            },
+            "type": "array"
+          },
+          "dateFormat": {
+            "enum": [
+              "DATE",
+              "DATE_TIME",
+              "TIME"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "elementId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "elementType": {
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "HEADING",
+              "PAGE_BREAK",
+              "ACCORDION",
+              "RADIO",
+              "SELECT",
+              "CHECKBOX",
+              "MATRIX_RADIO",
+              "MATRIX_CHECKBOX",
+              "DATE",
+              "NAME",
+              "PHONE",
+              "EMAIL",
+              "NUMBER",
+              "QUESTION",
+              "USERNAME",
+              "ATTACHMENT",
+              "LINEAR_SCALE",
+              "NATIONAL_ID_NUMBER",
+              "QUESTION_MULTILINE",
+              "SUBMISSION_REFERENCE"
+            ],
+            "type": "string"
+          },
+          "externalElementId": {
+            "type": "string"
+          },
+          "imageDTO": {
+            "$ref": "#/components/schemas/ImageDTO"
+          },
+          "isAnswerHashed": {
+            "type": "boolean"
+          },
+          "nationalIdNumberType": {
+            "enum": [
+              "ONLY_NUMBERS",
+              "NORWEGIAN_ID_NUMBER",
+              "CUSTOM"
+            ],
+            "type": "string"
+          },
+          "numberOfDecimals": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sequence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "subElements": {
+            "items": {
+              "$ref": "#/components/schemas/FormDefinitionSubElementDTO"
+            },
+            "type": "array"
+          },
+          "text": {
+            "type": "string"
+          },
+          "useForRedirectToForm": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "FormDefinitionSubElementDTO": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "externalElementId": {
+            "type": "string"
+          },
+          "questionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sequence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "subElementId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormForMySubmissionsDTO": {
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormIdDTO": {
+        "properties": {
+          "formId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "FormInfoDTO": {
+        "properties": {
+          "canEditForm": {
+            "type": "boolean"
+          },
+          "deleteDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "deliveryDestination": {
+            "type": "string"
+          },
+          "editorsContactEmail": {
+            "type": "string"
+          },
+          "editorsContactUrl": {
+            "type": "string"
+          },
+          "hasSubmissions": {
+            "type": "boolean"
+          },
+          "isCodebookValid": {
+            "type": "boolean"
+          },
+          "isOpen": {
+            "type": "boolean"
+          },
+          "lastSubmissionDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "markedForDeletionDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "modifiedBy": {
+            "$ref": "#/components/schemas/PersonDTO"
+          },
+          "modifiedDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "numberOfInvitations": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "numberOfPostponedSubmissions": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "numberOfSubmissions": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "receiptText": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormSettingsAndElementsDTO": {
+        "properties": {
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/ElementDTO"
+            },
+            "type": "array"
+          },
+          "formSettings": {
+            "$ref": "#/components/schemas/CreateFormSettingsDTO"
+          }
+        },
+        "type": "object"
+      },
+      "FormSettingsDTO": {
+        "properties": {
+          "afterDeliveryForwardFormIds": {
+            "maxLength": 200,
+            "minLength": 0,
+            "pattern": "^(([0-9]+)(,[0-9]+)*)?$",
+            "type": "string"
+          },
+          "automaticReminderIntervalInDays": {
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "canNotAnswerMessage": {
+            "type": "string"
+          },
+          "codebookActivated": {
+            "type": "boolean"
+          },
+          "collectsPersonalData": {
+            "type": "boolean"
+          },
+          "consentForm": {
+            "type": "boolean"
+          },
+          "deleteSubmissionsAfterNumberOfDays": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "deliveryDestination": {
+            "enum": [
+              "DATABASE",
+              "DATABASE_ENCRYPTED",
+              "EDUCLOUD",
+              "TSD"
+            ],
+            "type": "string"
+          },
+          "editorCryptKeyDatabaseEncrypted": {
+            "type": "string"
+          },
+          "editorCryptKeyDatabaseEncryptedFingerprint": {
+            "type": "string"
+          },
+          "editors": {
+            "items": {
+              "$ref": "#/components/schemas/PersonDTO"
+            },
+            "type": "array"
+          },
+          "editorsContactEmail": {
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 0,
+            "type": "string"
+          },
+          "editorsContactUrl": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "editorsSubmissionEmailType": {
+            "enum": [
+              "NONE",
+              "MESSAGE",
+              "SUBMISSION"
+            ],
+            "type": "string"
+          },
+          "editorsSubmissionEmails": {
+            "type": "string"
+          },
+          "emailInvitationText": {
+            "type": "string"
+          },
+          "emailReminderText": {
+            "type": "string"
+          },
+          "formId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "formType": {
+            "enum": [
+              "DEFAULT",
+              "HIGH_SECURITY",
+              "SIGN_UP",
+              "MULTIPLE_CHOICE",
+              "COURSE_EVALUATION"
+            ],
+            "type": "string"
+          },
+          "globalCopyPermissionEnabled": {
+            "type": "boolean"
+          },
+          "integrationTags": {
+            "type": "string"
+          },
+          "isDictaphone": {
+            "type": "boolean"
+          },
+          "languageCode": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxSubmissionsForm": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxSubmissionsPerson": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "netgroupsEditor": {
+            "items": {
+              "$ref": "#/components/schemas/NetgroupDTO"
+            },
+            "type": "array"
+          },
+          "netgroupsWithCopyPermission": {
+            "items": {
+              "$ref": "#/components/schemas/NetgroupDTO"
+            },
+            "type": "array"
+          },
+          "offeringReceiptToRespondent": {
+            "type": "boolean"
+          },
+          "openFrom": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "openTo": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "personalDataPurposeDescription": {
+            "type": "string"
+          },
+          "personalDataPurposeTypes": {
+            "items": {
+              "enum": [
+                "STUDY_OR_EDUCATION",
+                "EMPLOYEE",
+                "RESEARCH",
+                "OTHER"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "personalDataSharedOutsideInstitutionWith": {
+            "type": "string"
+          },
+          "personsWithCopyPermission": {
+            "items": {
+              "$ref": "#/components/schemas/PersonDTO"
+            },
+            "type": "array"
+          },
+          "postponable": {
+            "type": "boolean"
+          },
+          "randomizedOrder": {
+            "type": "boolean"
+          },
+          "receiptText": {
+            "type": "string"
+          },
+          "recurringInvitationIntervalInDays": {
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "recurringInvitationNumber": {
+            "format": "int32",
+            "minimum": 2,
+            "type": "integer"
+          },
+          "respondentGroup": {
+            "enum": [
+              "ALL",
+              "FEIDE",
+              "FEIDE_AND_EDUGAIN",
+              "INVITED",
+              "INVITED_CHAINED_SIGNING",
+              "ID_PORTEN_LEVEL_3",
+              "ID_PORTEN_LEVEL_4",
+              "ID_PORTEN_LEVEL_3_SIGNING",
+              "ID_PORTEN_LEVEL_4_SIGNING",
+              "HELSENORGE",
+              "HELSENORGE_SIGNING"
+            ],
+            "type": "string"
+          },
+          "retainRespondentAccessAfterDelivery": {
+            "type": "boolean"
+          },
+          "scoreResultDisplayType": {
+            "enum": [
+              "NONE",
+              "SCORE_ONLY",
+              "FULL_SOLUTION_AND_SCORE",
+              "ONLY_CHECK_ANSWER"
+            ],
+            "type": "string"
+          },
+          "sendingReceiptToRespondent": {
+            "type": "boolean"
+          },
+          "sensitivePersonalDataCollected": {
+            "type": "boolean"
+          },
+          "shouldHideProgressBar": {
+            "type": "boolean"
+          },
+          "smsInvitationText": {
+            "type": "string"
+          },
+          "superuser": {
+            "$ref": "#/components/schemas/FormSettingsSuperuserDTO"
+          },
+          "supportuser": {
+            "$ref": "#/components/schemas/FormSettingsSupportuserDTO"
+          },
+          "title": {
+            "maxLength": 130,
+            "minLength": 0,
+            "pattern": "^[#\\`\\'\"\\=\\!\\&\\+\\{\\}\\[\\]\\*\\;\\:\\(\\)\\/\\.\\,\\?_«»¿¡€¢–\\-\"\\@\\d\\s\\p{L}]+$",
+            "type": "string"
+          },
+          "titleForLogging": {
+            "type": "string"
+          },
+          "titleShort": {
+            "maxLength": 30,
+            "minLength": 0,
+            "pattern": "(?:[a-z0-9]+(?:(?:[-a-z0-9][a-z0-9]+)*|[a-z0-9]*))?",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collectsPersonalData",
+          "formType",
+          "languageCode",
+          "respondentGroup",
+          "sensitivePersonalDataCollected",
+          "title"
+        ],
+        "type": "object"
+      },
+      "FormSettingsSuperuserDTO": {
+        "properties": {
+          "afterDeliveryForwardCodebookValues": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "pattern": "^(([-_A-Za-z0-9]+)(,[-_A-Za-z0-9]+)*)?$",
+            "type": "string"
+          },
+          "afterDeliveryForwardUrl": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "receiptPageScript": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormSettingsSupportuserDTO": {
+        "properties": {
+          "theme": {
+            "enum": [
+              "DEFAULT",
+              "ABELHEALTH",
+              "AHO",
+              "ANSGAR",
+              "BARNEVERN_NOTODDEN",
+              "BARRATTDUE",
+              "BBJ",
+              "BGO",
+              "BI",
+              "DATATILSYNET",
+              "DMMH",
+              "DNVA",
+              "EDUCLOUD",
+              "EDUCSC",
+              "FHI",
+              "FMI",
+              "FYLKESBIBLIOTEKETABO",
+              "GATEJURISTENTROMSO",
+              "HELSEDIREKTORATET",
+              "HELSE_STAVANGER",
+              "HFY",
+              "HIOF",
+              "HIMOLDE",
+              "HIVOLDA",
+              "HLSENTERET",
+              "HK",
+              "INN",
+              "ISF",
+              "KHIO",
+              "KIRKENSBYMISJON",
+              "KRUS",
+              "KULTURAKADEMIET",
+              "LANDBRUKSDIREKTORATET",
+              "LDH",
+              "MF",
+              "MOBA",
+              "NHH",
+              "NIFU",
+              "NIH",
+              "NKVTS",
+              "NLA",
+              "NMBU",
+              "NMH",
+              "NOKUT",
+              "NORCE",
+              "NORD",
+              "NORDKAPP_KOMMUNE",
+              "NORDLANDSFORSKNING",
+              "NTNU",
+              "NTNU_SAMFORSK",
+              "NUBU",
+              "OSLOMET",
+              "OSLONH",
+              "OUS",
+              "PHS",
+              "RADICH",
+              "RBUP",
+              "SAMAS",
+              "SIKT",
+              "SINTEF",
+              "SSHF",
+              "SYKEHUSET_INNLANDET",
+              "UIA",
+              "UIB",
+              "UIS",
+              "UIT",
+              "UNIS",
+              "USN",
+              "VESTFOLDFYLKE",
+              "VESTRE_VIKEN",
+              "VETINST",
+              "VID",
+              "NOLOGO"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ImageDTO": {
+        "properties": {
+          "filename": {
+            "type": "string"
+          },
+          "imageId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "InvitationMetadataDTO": {
+        "properties": {
+          "createdBy": {
+            "$ref": "#/components/schemas/PersonDTO"
+          },
+          "createdDate": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "invitationMetadataId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "invitationMetadataState": {
+            "enum": [
+              "PROCESSING",
+              "SENDING_EMAIL",
+              "SENT",
+              "INVALID_RECIPIENT",
+              "DUPLICATE",
+              "CANNOT_ANSWER",
+              "SCHEDULED"
+            ],
+            "type": "string"
+          },
+          "invitations": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationVersion2DTO"
+            },
+            "type": "array"
+          },
+          "invited": {
+            "$ref": "#/components/schemas/PersonDTO"
+          },
+          "invitedPersonStringRaw": {
+            "type": "string"
+          },
+          "lastRemindedDate": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "numberOfInvitations": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "numberOfSubmissions": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sendAfterDate": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InvitationVersion2DTO": {
+        "properties": {
+          "createdDate": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "invitationId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "invitationState": {
+            "enum": [
+              "NEW",
+              "TO_BE_REMINDED",
+              "SENT",
+              "INVALID_RECIPIENT",
+              "ANSWERED"
+            ],
+            "type": "string"
+          },
+          "isAnonymous": {
+            "type": "boolean",
+            "writeOnly": true
+          }
+        },
+        "type": "object"
+      },
+      "MultiValueMapStringString": {
+        "additionalProperties": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "properties": {
+          "all": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "writeOnly": true
+          },
+          "empty": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "MyFormsDTO": {
+        "properties": {
+          "anonymous": {
+            "type": "boolean"
+          },
+          "deliveryDestination": {
+            "type": "string"
+          },
+          "formId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "isDictaphone": {
+            "type": "boolean"
+          },
+          "lastSubmissionDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "modifiedDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "myFormsFormListingGroup": {
+            "enum": [
+              "MY",
+              "SHARED",
+              "OLD",
+              "COPY",
+              "ERASED"
+            ],
+            "type": "string"
+          },
+          "numberOfDeliveredSubmissions": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "open": {
+            "type": "boolean"
+          },
+          "openFrom": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "openTo": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "owners": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "personalDataErasedDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MySubmissionsDTO": {
+        "properties": {
+          "createdDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "delivered": {
+            "type": "boolean"
+          },
+          "form": {
+            "$ref": "#/components/schemas/FormForMySubmissionsDTO"
+          },
+          "modifiedDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "submissionId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "NetgroupDTO": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "netgroupId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PersonDTO": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "hasAccessForCourseEvaluation": {
+            "type": "boolean"
+          },
+          "isSuperuser": {
+            "type": "boolean"
+          },
+          "isSupportuser": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "LOCAL",
+              "TOKEN",
+              "EDUGAIN",
+              "FEIDE",
+              "ID_PORTEN",
+              "API",
+              "TSD",
+              "API_CLIENT"
+            ],
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SingleSubmissionDTO": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerDTO"
+            },
+            "type": "array"
+          },
+          "submissionMetadata": {
+            "$ref": "#/components/schemas/SubmissionMetadataDTO"
+          }
+        },
+        "type": "object"
+      },
+      "SubElementDTO": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "externalElementId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "isMandatory": {
+            "type": "boolean"
+          },
+          "questionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sendAdditionalRecipientEmail": {
+            "type": "boolean"
+          },
+          "sequence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "subElementId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SubmissionMetadataDTO": {
+        "properties": {
+          "anonymous": {
+            "type": "boolean"
+          },
+          "answerTime": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "deliveryDestination": {
+            "type": "string"
+          },
+          "formId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "forwardedTo": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "invited": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "modifiedDate": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "person": {
+            "$ref": "#/components/schemas/SubmissionMetadataPersonDTO"
+          },
+          "respondentEmail": {
+            "type": "string"
+          },
+          "respondentName": {
+            "type": "string"
+          },
+          "submissionId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "submissionSignatureState": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SubmissionMetadataPersonDTO": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TranscribeDTO": {
+        "properties": {
+          "isDiarizeEnabled": {
+            "type": "boolean"
+          },
+          "isTranslateToEnglishEnabled": {
+            "type": "boolean"
+          },
+          "language": {
+            "enum": [
+              "auto",
+              "en",
+              "zh",
+              "de",
+              "es",
+              "ru",
+              "ko",
+              "fr",
+              "ja",
+              "pt",
+              "tr",
+              "pl",
+              "ca",
+              "nl",
+              "ar",
+              "sv",
+              "it",
+              "id",
+              "hi",
+              "fi",
+              "vi",
+              "he",
+              "uk",
+              "el",
+              "ms",
+              "cs",
+              "ro",
+              "da",
+              "hu",
+              "ta",
+              "no",
+              "th",
+              "ur",
+              "hr",
+              "bg",
+              "lt",
+              "la",
+              "mi",
+              "ml",
+              "cy",
+              "sk",
+              "te",
+              "fa",
+              "lv",
+              "bn",
+              "sr",
+              "az",
+              "sl",
+              "kn",
+              "et",
+              "mk",
+              "br",
+              "eu",
+              "is",
+              "hy",
+              "ne",
+              "mn",
+              "bs",
+              "kk",
+              "sq",
+              "sw",
+              "gl",
+              "mr",
+              "pa",
+              "si",
+              "km",
+              "sn",
+              "yo",
+              "so",
+              "af",
+              "oc",
+              "ka",
+              "be",
+              "tg",
+              "sd",
+              "gu",
+              "am",
+              "yi",
+              "lo",
+              "uz",
+              "fo",
+              "ht",
+              "ps",
+              "tk",
+              "nn",
+              "mt",
+              "sa",
+              "lb",
+              "my",
+              "bo",
+              "tl",
+              "mg",
+              "as",
+              "tt",
+              "haw",
+              "ln",
+              "ha",
+              "ba",
+              "jw",
+              "su",
+              "yue"
+            ],
+            "type": "string"
+          },
+          "model": {
+            "enum": [
+              "model_auto",
+              "nb_whisper_large_semantic",
+              "nb_whisper_large_verbatim",
+              "openai_whisper_large_v3",
+              "openai_whisper_large_v2",
+              "KBLab-large"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TsdRespondent": {
+        "properties": {
+          "personal_identifier": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "representation": {
+            "$ref": "#/components/schemas/AuthorizationDetails"
+          },
+          "sub": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ValidationScriptDTO": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "elementId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "formId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "formTitle": {
+            "type": "string"
+          },
+          "modifiedBy": {
+            "type": "string"
+          },
+          "modifiedDate": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "validationScriptId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "Access token": {
+        "bearerFormat": "JWT",
+        "name": "Access token",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Terms of use: [https://www.uio.no/english/services/it/adm-services/nettskjema/privacy/tos.html](https://www.uio.no/english/services/it/adm-services/nettskjema/privacy/tos.html)\n\nDocumentation: [https://www.uio.no/english/services/it/adm-services/nettskjema/help/api-clients-v3.md](https://www.uio.no/english/services/it/adm-services/nettskjema/help/api-clients-v3.md)\n\nAuthorize your requests with your **access token** by clicking the *Authorise* button on the right side\n",
+    "title": "Nettskjema api",
+    "version": "v3"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/form": {
+      "delete": {
+        "operationId": "deleteForm",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days-in-trash-can",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete a list of forms by ids",
+        "tags": [
+          "Delete forms"
+        ]
+      },
+      "post": {
+        "operationId": "createForm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormSettingsAndElementsDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormIdDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Create a form"
+        ]
+      }
+    },
+    "/form/invitation/{invitationId}/submission": {
+      "post": {
+        "operationId": "deliverSubmissionForInvitation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitationId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverSubmissionDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Delivering submissions to invitations"
+        ]
+      }
+    },
+    "/form/me": {
+      "get": {
+        "operationId": "myForms",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MyFormsDTO"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Information about forms"
+        ]
+      }
+    },
+    "/form/submission/attachment/{answerAttachmentId}": {
+      "get": {
+        "operationId": "getAnswerAttachmentStream",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answerAttachmentId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Attachment for a submission"
+        ]
+      }
+    },
+    "/form/submission/me": {
+      "get": {
+        "operationId": "getMe",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MySubmissionsDTO"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "List of my submissions"
+        ]
+      }
+    },
+    "/form/submission/{submissionId}": {
+      "get": {
+        "operationId": "getSubmission",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "submissionId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleSubmissionDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Submission with answers"
+        ]
+      }
+    },
+    "/form/submission/{submissionId}/attachment": {
+      "put": {
+        "operationId": "deliverAttachmentStream",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "submissionId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "questionId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileSize",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "diarize",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "translate-to-english",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "The values comes from the body response on the endpoint /form/{formId}/submission as attachmentToken",
+            "in": "header",
+            "name": "X-nettskjema-attachment-token",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Delivering attachments to forms"
+        ]
+      }
+    },
+    "/form/submission/{submissionId}/pdf": {
+      "get": {
+        "operationId": "getPdf",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "submissionId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {}
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Submission as a PDF"
+        ]
+      }
+    },
+    "/form/titleshort/{titleShort}": {
+      "get": {
+        "operationId": "getFormId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "titleShort",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Find form id from title short"
+        ]
+      }
+    },
+    "/form/{formId}/activate/educloud": {
+      "post": {
+        "operationId": "activateEducloud",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateFormDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Activate forms for HighSecurity"
+        ]
+      }
+    },
+    "/form/{formId}/activate/tsd": {
+      "post": {
+        "operationId": "activateTsd",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateFormDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Activate forms for HighSecurity"
+        ]
+      }
+    },
+    "/form/{formId}/answers": {
+      "get": {
+        "operationId": "getAllAnswers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "submission-ids-greater-than",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "element-ids",
+            "required": false,
+            "schema": {
+              "items": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "optimize-for-large-data",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "All answers for a form"
+        ]
+      }
+    },
+    "/form/{formId}/codebook": {
+      "put": {
+        "operationId": "deliverCodebook",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodebookDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Updating codebook"
+        ]
+      }
+    },
+    "/form/{formId}/csv-report": {
+      "get": {
+        "operationId": "getCsvReport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "optimize-for-large-data",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "CSV text file with semicolon (;) as delimiter",
+        "tags": [
+          "Reports on form"
+        ]
+      }
+    },
+    "/form/{formId}/definition": {
+      "get": {
+        "operationId": "tsdActivationJsonNew",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDefinitionDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Activate forms for HighSecurity"
+        ]
+      }
+    },
+    "/form/{formId}/elements": {
+      "get": {
+        "operationId": "elements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ElementDTO"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List of elements for answering form",
+        "tags": [
+          "Elements in form"
+        ]
+      },
+      "put": {
+        "operationId": "putElements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/ElementDTO"
+                },
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Elements in form"
+        ]
+      }
+    },
+    "/form/{formId}/excel-report": {
+      "get": {
+        "operationId": "getExcelReport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "optimize-for-large-data",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Excel file",
+        "tags": [
+          "Reports on form"
+        ]
+      }
+    },
+    "/form/{formId}/info": {
+      "get": {
+        "operationId": "getInfo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormInfoDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Info about the form for answering",
+        "tags": [
+          "Information about a form"
+        ]
+      }
+    },
+    "/form/{formId}/invitation": {
+      "delete": {
+        "operationId": "deleteInvitations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "array",
+                "uniqueItems": true
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete list of invitations",
+        "tags": [
+          "Delete invitations"
+        ]
+      }
+    },
+    "/form/{formId}/invitations": {
+      "delete": {
+        "operationId": "deleteAllInvitations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "array",
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete all invitations",
+        "tags": [
+          "Delete invitations"
+        ]
+      },
+      "get": {
+        "operationId": "getAllInvitations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationMetadataDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "List all invitations"
+        ]
+      },
+      "post": {
+        "operationId": "createInvitationMetadata",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "isSmsInvitation",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sendAfterDate",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateInvitationResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Create new invitations"
+        ]
+      }
+    },
+    "/form/{formId}/remind": {
+      "post": {
+        "operationId": "remind",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Send invitation reminders"
+        ]
+      }
+    },
+    "/form/{formId}/settings": {
+      "get": {
+        "operationId": "getFormSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is-for-create-form",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormSettingsDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Settings for form"
+        ]
+      },
+      "patch": {
+        "description": "The request body can contain either one or multiple properties from FormSettingsDTO",
+        "operationId": "patchFormSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "forceCleanup",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormSettingsDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No content."
+          },
+          "207": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            },
+            "description": "Not every setting was updated. See body for details"
+          }
+        },
+        "summary": "Update form settings",
+        "tags": [
+          "Settings for form"
+        ]
+      }
+    },
+    "/form/{formId}/settings/validation": {
+      "get": {
+        "operationId": "getFormSettingsValidation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Settings for form"
+        ]
+      }
+    },
+    "/form/{formId}/spss-syntax": {
+      "get": {
+        "operationId": "getSpssSyntaxFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "SPSS syntax file",
+        "tags": [
+          "Reports on form"
+        ]
+      }
+    },
+    "/form/{formId}/submission": {
+      "delete": {
+        "operationId": "deleteSubmission",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete list of submissions",
+        "tags": [
+          "Delete submissions"
+        ]
+      },
+      "post": {
+        "operationId": "deliverSubmission",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverSubmissionDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Delivering submissions to forms"
+        ]
+      }
+    },
+    "/form/{formId}/submission-metadata": {
+      "get": {
+        "operationId": "getAllMetadataAnswers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "submission-ids-greater-than",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "optimize-for-large-data",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionMetadataDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "All submission metadata for a form"
+        ]
+      }
+    },
+    "/form/{formId}/submission-metadata-postponed": {
+      "get": {
+        "operationId": "getAllPostponedMetadataAnswers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "submission-ids-greater-than",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionMetadataDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "All submission metadata on postponed submissions for a form"
+        ]
+      }
+    },
+    "/form/{formId}/submissions": {
+      "delete": {
+        "operationId": "deleteAllSubmissions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "formId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete all submissions",
+        "tags": [
+          "Delete submissions"
+        ]
+      }
+    },
+    "/image": {
+      "post": {
+        "operationId": "postImage",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "format": "byte",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Laster opp et bilde til Vortex",
+        "tags": [
+          "Images uploaded when creating forms"
+        ]
+      }
+    },
+    "/image/{imageId}": {
+      "get": {
+        "operationId": "showImage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "imageId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Referer",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Images uploaded when creating forms"
+        ]
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "getEnvironment",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Information about the user"
+        ]
+      }
+    },
+    "/personal-data/collects-personal-data": {
+      "get": {
+        "operationId": "getFormsCollectsPersonalData",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "anonymous",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inactive-personal-data-suspected",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FormCollectPersonalDataDTO"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Forms for theme which collects personal data"
+        ]
+      }
+    },
+    "/submission/attachment/{answerAttachmentId}/retranscribe": {
+      "post": {
+        "operationId": "retranscribe",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answerAttachmentId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranscribeDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Re-transcribe recordings from the Dictaphone application"
+        ]
+      }
+    },
+    "/submission/attachment/{answerAttachmentId}/transcribed/json": {
+      "get": {
+        "operationId": "getAttachmentTranscribedJson",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answerAttachmentId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Transcription of recordings from the Dictaphone application"
+        ]
+      }
+    },
+    "/submission/attachment/{answerAttachmentId}/transcribed/txt": {
+      "get": {
+        "operationId": "getAttachmentTranscribedTxt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answerAttachmentId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Transcription of recordings from the Dictaphone application"
+        ]
+      }
+    },
+    "/submission/attachment/{answerAttachmentId}/transcribed/vtt": {
+      "get": {
+        "operationId": "getAttachmentTranscribed",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answerAttachmentId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Transcription of recordings from the Dictaphone application"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "Access token": []
+    }
+  ],
+  "servers": [
+    {
+      "description": "Generated server url",
+      "url": "https://nettskjema.no/api/v3"
+    }
+  ]
+}

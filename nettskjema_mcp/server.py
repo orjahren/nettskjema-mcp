@@ -150,6 +150,7 @@ from nettskjema_mcp.tools import (  # noqa: E402
     elements,  # noqa: F401
     exports,  # noqa: F401
     forms,  # noqa: F401
+    invitations,  # noqa: F401
     meta,  # noqa: F401
     submissions,  # noqa: F401
 )

@@ -145,6 +145,7 @@ def main() -> None:
 # module is one line here and nothing else.
 from nettskjema_mcp.tools import (  # noqa: E402
     answers,  # noqa: F401
+    attachments,  # noqa: F401
     elements,  # noqa: F401
     exports,  # noqa: F401
     forms,  # noqa: F401

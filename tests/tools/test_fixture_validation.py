@@ -70,6 +70,10 @@ ALL_FIXTURES: list[tuple[str, str, Any, str]] = [
 # registration would be validated against a schema it has nothing to do with.
 DISCOVERY_EXEMPT: dict[tuple[str, str], str] = {
     # (module, constant) -> reason
+    (
+        "test_attachments",
+        "TRANSCRIBED_JSON_RESPONSE",
+    ): "Synthetic fixture for a route with no documented response schema",
 }
 
 

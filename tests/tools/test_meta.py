@@ -4,6 +4,7 @@ import ast
 import inspect
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -116,6 +117,44 @@ def test_no_print_calls_in_the_package() -> None:
                 offenders.append(f"{path.relative_to(package_root)}:{node.lineno}")
 
     assert offenders == []
+
+
+# A docstring reference to an endpoint, as every module writes them: a verb, a
+# space, and a path. Frontend URLs are excluded by the leading slash — they are
+# written out as https://nettskjema.no/... and never follow a verb.
+_ENDPOINT_MENTION = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/[A-Za-z0-9{}/_.-]+)")
+
+
+def test_no_docstring_names_an_endpoint_that_does_not_exist() -> None:
+    """
+    An endpoint named in a docstring must be one the spec declares.
+
+    Docstrings cite neighbouring endpoints to tell a model where a value comes
+    from or what to call next — "the attachmentToken field in the response body
+    of POST /form/{formId}/submission". A model follows that citation, so a path
+    that does not exist sends it somewhere that will never answer. The version
+    being replaced shipped five tools calling endpoints that do not exist; this
+    is the same defect one level down, in prose rather than in a request, and
+    Task 15 shipped one — a single-invitation send route that the API has never
+    had. Only the path is checked, not the verb: the point is that the route is
+    real, and a wrong verb beside a real path is a different, louder mistake.
+    """
+    declared = set(load_spec()["paths"])  # type: ignore[arg-type]
+    package_root = Path(nettskjema_mcp.__file__).parent
+
+    offenders = []
+    for path in sorted(package_root.rglob("*.py")):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for verb, mentioned in _ENDPOINT_MENTION.findall(line):
+                if mentioned.rstrip(".,);") not in declared:
+                    offenders.append(
+                        f"{path.relative_to(package_root)}:{lineno} names {verb} {mentioned}"
+                    )
+
+    assert offenders == [], (
+        "these docstrings cite endpoints the vendored spec does not declare: "
+        + "; ".join(offenders)
+    )
 
 
 def test_server_imports_every_tool_module() -> None:

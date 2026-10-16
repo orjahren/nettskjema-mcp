@@ -21,12 +21,10 @@ async def remind_all_pending_invitations(form_id: int) -> str:
     Send reminder emails to every pending invitation on a form.
 
     This operation is all-or-nothing: every sent invitation on the form receives
-    a reminder. There is no endpoint to remind a subset of invitations. The
-    reminder targets only invitations created through the single-invitation API
-    (POST /form/{formId}/invitation/{id}/send). Invitations created through the
-    batch invitation endpoint may share the same storage, but nothing in the
-    spec states that the reminder reaches them, and inference from shared storage
-    is not enough to document it here.
+    a reminder. There is no endpoint to remind a subset of invitations. Whether
+    it also reaches invitations created through the newer batch interface is not
+    documented anywhere; they may share the same storage, but that is an
+    inference and not something the API states.
 
     Creating, viewing and deleting invitations are not available through this MCP
     server. Those operations are public Nettskjema features — supported,

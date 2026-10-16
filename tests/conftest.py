@@ -14,8 +14,20 @@ TEST_AUTH_URL = "https://authorization.nettskjema.invalid/oauth2/token"
 
 
 @pytest.fixture(autouse=True)
-def isolated_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Point every test at unroutable hosts and reset the module-level caches."""
+def isolated_environment(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """
+    Point every test at unroutable hosts and reset the module-level caches.
+
+    Tests marked ``e2e`` are left alone: they talk to a real environment, and
+    pinning them to an unroutable host would make the suite unrunnable even when
+    it is selected deliberately with ``-m e2e``.
+    """
+    if request.node.get_closest_marker("e2e") is not None:
+        yield
+        return
+
     monkeypatch.setenv("NETTSKJEMA_BASE_URL", TEST_BASE_URL)
     monkeypatch.setenv("NETTSKJEMA_AUTH_URL", TEST_AUTH_URL)
     monkeypatch.setenv("NETTSKJEMA_CLIENT_ID", "test-client")

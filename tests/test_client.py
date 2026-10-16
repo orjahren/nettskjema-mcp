@@ -11,7 +11,13 @@ import pytest
 import respx
 
 from nettskjema_mcp import client as client_module
-from nettskjema_mcp.client import NO_CONTENT_RESULT, NettskjemaClient, dump, get_client
+from nettskjema_mcp.client import (
+    NO_CONTENT_RESULT,
+    NettskjemaClient,
+    aclose_client,
+    dump,
+    get_client,
+)
 from nettskjema_mcp.config import Settings
 from nettskjema_mcp.errors import (
     BadRequestError,
@@ -67,6 +73,20 @@ def token_route(respx_mock: respx.MockRouter) -> respx.Route:
     return respx_mock.post(AUTH_URL).mock(
         return_value=httpx.Response(200, json={"access_token": "test-token", "expires_in": 86400})
     )
+
+
+class _FailingStream(httpx.AsyncByteStream):
+    """A stream that delivers one chunk and then drops, like a severed connection."""
+
+    def __init__(self, first_chunk: bytes) -> None:
+        self._first_chunk = first_chunk
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        yield self._first_chunk
+        raise httpx.ReadError("the connection was dropped mid-body")
+
+    async def aclose(self) -> None:
+        """Nothing to release."""
 
 
 async def test_path_and_query_parameters_are_applied(
@@ -129,6 +149,36 @@ async def test_204_returns_a_success_marker(
 
     assert result == {"status": "success", "httpStatus": 204}
     assert result == NO_CONTENT_RESULT
+
+
+async def test_empty_body_marker_reports_the_actual_status(
+    client: NettskjemaClient, respx_mock: respx.MockRouter
+) -> None:
+    """A bodiless 201 must not claim to be a 204."""
+    respx_mock.post(f"{BASE_URL}/form").mock(return_value=httpx.Response(201))
+
+    result = await client.json(Route("POST", "/form"), body={"title": "New form"})
+
+    assert result == {"status": "success", "httpStatus": 201}
+
+
+async def test_non_json_success_body_raises_upstream_error(
+    client: NettskjemaClient, respx_mock: respx.MockRouter
+) -> None:
+    """A 200 serving an HTML login page is a failure, not a successful result."""
+    html = "<html><body><h1>Log in to continue</h1>" + "<p>filler</p>" * 200 + "</body></html>"
+    respx_mock.get(f"{BASE_URL}/form/9/info").mock(
+        return_value=httpx.Response(200, headers={"content-type": "text/html"}, text=html)
+    )
+
+    with pytest.raises(UpstreamError) as excinfo:
+        await client.json(FORM_INFO, path={"formId": 9})
+
+    message = str(excinfo.value)
+    assert excinfo.value.status == 200
+    assert "not JSON" in message
+    assert "Log in to continue" in message
+    assert len(message) < 1000
 
 
 async def test_207_raises_partial_success_with_the_body_detail(
@@ -213,6 +263,7 @@ async def test_ndjson_parses_one_object_per_line(
         "rows": [{"id": 1}, {"id": 2}, {"id": 3}],
         "rowCount": 3,
         "truncated": False,
+        "reason": None,
     }
 
 
@@ -228,6 +279,7 @@ async def test_ndjson_caps_rows_and_marks_truncated(
     assert result["rowCount"] == 2
     assert result["rows"] == [{"id": 1}, {"id": 2}]
     assert result["truncated"] is True
+    assert result["reason"] == "rowCap"
 
 
 async def test_ndjson_default_cap_comes_from_settings(
@@ -246,6 +298,7 @@ async def test_ndjson_default_cap_comes_from_settings(
 
     assert result["rowCount"] == 3
     assert result["truncated"] is True
+    assert result["reason"] == "rowCap"
 
 
 async def test_ndjson_skips_blank_lines(
@@ -258,7 +311,12 @@ async def test_ndjson_skips_blank_lines(
 
     result = await client.ndjson(ANSWERS, path={"formId": 5})
 
-    assert result == {"rows": [{"id": 1}, {"id": 2}], "rowCount": 2, "truncated": False}
+    assert result == {
+        "rows": [{"id": 1}, {"id": 2}],
+        "rowCount": 2,
+        "truncated": False,
+        "reason": None,
+    }
 
 
 async def test_ndjson_reports_a_truncated_final_line(
@@ -274,6 +332,7 @@ async def test_ndjson_reports_a_truncated_final_line(
     assert result["rows"] == [{"id": 1}, {"id": 2}]
     assert result["rowCount"] == 2
     assert result["truncated"] is True
+    assert result["reason"] == "incompleteFinalLine"
 
 
 async def test_ndjson_raises_the_typed_exception_on_error_status(
@@ -286,6 +345,20 @@ async def test_ndjson_raises_the_typed_exception_on_error_status(
 
     with pytest.raises(NotFoundError):
         await client.ndjson(ANSWERS, path={"formId": 5})
+
+
+async def test_ndjson_translates_a_mid_stream_transport_failure(
+    client: NettskjemaClient, respx_mock: respx.MockRouter
+) -> None:
+    """A connection dropped mid-body raises UpstreamError, not a raw httpx error."""
+    respx_mock.get(f"{BASE_URL}/form/5/answers").mock(
+        return_value=httpx.Response(200, stream=_FailingStream(b'{"id": 1}\n{"id": 2}\n'))
+    )
+
+    with pytest.raises(UpstreamError) as excinfo:
+        await client.ndjson(ANSWERS, path={"formId": 5})
+
+    assert "ReadError" in str(excinfo.value)
 
 
 async def test_binary_writes_to_output_path_and_reports_size(
@@ -333,8 +406,48 @@ async def test_binary_without_output_path_writes_to_a_temp_file(
         written.unlink(missing_ok=True)
 
 
-async def test_binary_rejects_a_missing_parent_directory(
+async def test_binary_translates_a_mid_stream_transport_failure(
     client: NettskjemaClient, respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """A dropped download raises UpstreamError and leaves no partial file behind."""
+    respx_mock.get(f"{BASE_URL}/form/3/excel-report").mock(
+        return_value=httpx.Response(
+            200,
+            stream=_FailingStream(b"PK\x03\x04half-a-workbook"),
+            headers={"content-type": XLSX_MEDIA_TYPE},
+        )
+    )
+    target = tmp_path / "report.xlsx"
+
+    with pytest.raises(UpstreamError) as excinfo:
+        await client.binary(EXCEL_REPORT, path={"formId": 3}, output_path=str(target))
+
+    assert "ReadError" in str(excinfo.value)
+    # A half-written export must not be left looking like a complete one.
+    assert not target.exists()
+
+
+async def test_binary_keeps_an_existing_file_when_the_request_fails(
+    client: NettskjemaClient, respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """Cleanup only removes files we wrote: a failure before writing touches nothing."""
+    respx_mock.get(f"{BASE_URL}/form/3/excel-report").mock(
+        return_value=httpx.Response(404, json={"message": "No such form"})
+    )
+    target = tmp_path / "report.xlsx"
+    target.write_bytes(b"an earlier export")
+
+    with pytest.raises(NotFoundError):
+        await client.binary(EXCEL_REPORT, path={"formId": 3}, output_path=str(target))
+
+    assert target.read_bytes() == b"an earlier export"
+
+
+async def test_binary_rejects_a_missing_parent_directory(
+    client: NettskjemaClient,
+    respx_mock: respx.MockRouter,
+    token_route: respx.Route,
+    tmp_path: Path,
 ) -> None:
     """Review Focus 3: the parent check happens before the request is issued."""
     route = respx_mock.get(f"{BASE_URL}/form/3/excel-report").mock(
@@ -347,6 +460,8 @@ async def test_binary_rejects_a_missing_parent_directory(
 
     assert str(target) in str(excinfo.value)
     assert route.call_count == 0
+    # Nothing at all happened: not even the token was fetched.
+    assert token_route.call_count == 0
 
 
 async def test_binary_rejects_an_unwritable_parent_directory(
@@ -399,20 +514,36 @@ async def test_missing_path_parameter_raises_bad_request(
     assert route.call_count == 0
 
 
-async def test_get_client_returns_one_pooled_instance() -> None:
-    """get_client caches a single instance per process; reset_client clears it."""
-    first = get_client()
-    try:
-        assert get_client() is first
-    finally:
-        await first.aclose()
+async def test_token_endpoint_transport_failure_is_translated(
+    client: NettskjemaClient, respx_mock: respx.MockRouter, token_route: respx.Route
+) -> None:
+    """A connection failure reaching the token endpoint must not leak httpx."""
+    token_route.mock(side_effect=httpx.ConnectError("no route to host"))
 
-    client_module.reset_client()
+    with pytest.raises(UpstreamError) as excinfo:
+        await client.json(FORM_INFO, path={"formId": 1})
+
+    assert "ConnectError" in str(excinfo.value)
+
+
+async def test_get_client_returns_one_pooled_instance() -> None:
+    """get_client caches a single instance per process; aclose_client clears it."""
+    first = get_client()
+    assert get_client() is first
+
+    await aclose_client()
     second = get_client()
     try:
         assert second is not first
     finally:
-        await second.aclose()
+        await aclose_client()
+
+
+async def test_aclose_client_is_safe_without_a_cached_client() -> None:
+    """Closing when nothing was created is a no-op, not an error."""
+    client_module.reset_client()
+    await aclose_client()
+    await aclose_client()
 
 
 def test_dump_renders_readable_json() -> None:

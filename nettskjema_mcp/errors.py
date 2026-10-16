@@ -4,6 +4,29 @@ from fastmcp.exceptions import ToolError
 
 from nettskjema_mcp.config import get_settings
 
+# Error detail is rendered into a model's context, so it must stay bounded. A
+# validation failure on a large form can carry hundreds of field errors, and a
+# single message can itself be arbitrarily long.
+MAX_FIELD_ERRORS_RENDERED = 20
+MAX_FIELD_ERROR_LENGTH = 200
+
+
+def trim_excerpt(text: str, limit: int) -> str:
+    """
+    Collapse whitespace and trim text to a bounded single-line excerpt.
+
+    Args:
+        text: The text to trim.
+        limit: Maximum number of characters to keep.
+
+    Returns:
+        A single-line excerpt, suffixed with a marker when it was trimmed.
+    """
+    collapsed = " ".join(text.split())
+    if len(collapsed) <= limit:
+        return collapsed
+    return f"{collapsed[:limit]}… (truncated)"
+
 
 class NettskjemaError(Exception):
     """Base exception for Nettskjema API errors."""
@@ -29,11 +52,27 @@ class NettskjemaError(Exception):
         self.field_errors = field_errors or {}
 
     def __str__(self) -> str:
-        """Render the error with field-level detail."""
+        """
+        Render the error with field-level detail, bounded.
+
+        Field errors come from the backend and are otherwise unbounded in both
+        count and length, so they are capped the same way response-body excerpts
+        are. Anything left out is counted rather than silently dropped.
+        """
         parts = [self.message]
+        rendered = 0
+        omitted = 0
         for field, errors in self.field_errors.items():
             for error in errors:
-                parts.append(f"{field} → {error}")
+                if rendered >= MAX_FIELD_ERRORS_RENDERED:
+                    omitted += 1
+                    continue
+                name = trim_excerpt(str(field), MAX_FIELD_ERROR_LENGTH)
+                detail = trim_excerpt(str(error), MAX_FIELD_ERROR_LENGTH)
+                parts.append(f"{name} → {detail}")
+                rendered += 1
+        if omitted:
+            parts.append(f"… and {omitted} more field error(s) not shown.")
         return "\n".join(parts)
 
 

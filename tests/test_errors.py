@@ -4,6 +4,8 @@ import pytest
 from fastmcp.exceptions import ToolError as FastMCPToolError
 
 from nettskjema_mcp.errors import (
+    MAX_FIELD_ERROR_LENGTH,
+    MAX_FIELD_ERRORS_RENDERED,
     AuthenticationError,
     BadRequestError,
     ConflictError,
@@ -45,6 +47,35 @@ def test_field_errors_are_preserved() -> None:
     exc = error_for_status(400, body)
     assert exc.field_errors == {"title": ["must not be blank"]}
     assert "title" in str(exc) and "must not be blank" in str(exc)
+
+
+def test_field_errors_are_capped_in_count() -> None:
+    """Only a bounded number of field errors are rendered; the rest are counted."""
+    total = MAX_FIELD_ERRORS_RENDERED + 7
+    exc = BadRequestError(
+        "Validation failed",
+        status=400,
+        field_errors={f"field{n}": ["must not be blank"] for n in range(total)},
+    )
+
+    text = str(exc)
+
+    assert text.count(" → ") == MAX_FIELD_ERRORS_RENDERED
+    assert "and 7 more field error(s) not shown." in text
+
+
+def test_field_errors_are_capped_in_length() -> None:
+    """A single enormous field message is trimmed rather than rendered whole."""
+    exc = BadRequestError(
+        "Validation failed",
+        status=400,
+        field_errors={"title": ["y" * 5000]},
+    )
+
+    text = str(exc)
+
+    assert "(truncated)" in text
+    assert len(text) < MAX_FIELD_ERROR_LENGTH + 100
 
 
 def test_forbidden_names_the_permission_step() -> None:

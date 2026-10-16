@@ -27,6 +27,7 @@ from nettskjema_mcp.errors import (
     PartialSuccessError,
     UpstreamError,
     error_for_status,
+    trim_excerpt,
 )
 from nettskjema_mcp.routes import Route
 
@@ -35,10 +36,6 @@ logger = logging.getLogger(__name__)
 # Error bodies are quoted back to the caller. Cap the excerpt so an HTML error
 # page from a proxy cannot flood a model's context window.
 ERROR_BODY_EXCERPT_LIMIT = 500
-
-# What a tool reports after a request that succeeded with no response body.
-# Stable by contract: tools render this verbatim, so models can rely on it.
-NO_CONTENT_RESULT: dict[str, object] = {"status": "success", "httpStatus": 204}
 
 DEFAULT_MEDIA_TYPE = "application/octet-stream"
 
@@ -61,7 +58,7 @@ def dump(value: object) -> str:
 
 def excerpt(text: str, limit: int = ERROR_BODY_EXCERPT_LIMIT) -> str:
     """
-    Collapse whitespace and trim a body to a bounded excerpt.
+    Collapse whitespace and trim a response body to a bounded excerpt.
 
     Args:
         text: Raw response body text.
@@ -70,10 +67,40 @@ def excerpt(text: str, limit: int = ERROR_BODY_EXCERPT_LIMIT) -> str:
     Returns:
         A single-line excerpt, suffixed with a marker when it was trimmed.
     """
-    collapsed = " ".join(text.split())
-    if len(collapsed) <= limit:
-        return collapsed
-    return f"{collapsed[:limit]}… (truncated)"
+    return trim_excerpt(text, limit)
+
+
+def no_content_result(status: int) -> dict[str, object]:
+    """
+    Build the success marker for a response that carried no body.
+
+    Args:
+        status: The actual HTTP status, so a bodiless 201 is not reported as 204.
+
+    Returns:
+        A small, stable dict that tools render verbatim.
+    """
+    return {"status": "success", "httpStatus": status}
+
+
+# The canonical shape of a no-body success, for reference and tests. The value
+# a tool actually sees carries the real status, which is usually but not always 204.
+NO_CONTENT_RESULT: dict[str, object] = no_content_result(204)
+
+
+class _NotJson:
+    """
+    A response body that could not be parsed as JSON, with a bounded excerpt.
+
+    A distinct type rather than a bare string, so that a body which legitimately
+    decodes to a JSON string is never mistaken for a parse failure.
+    """
+
+    __slots__ = ("text",)
+
+    def __init__(self, text: str) -> None:
+        """Store the bounded excerpt of the unparseable body."""
+        self.text = text
 
 
 def _decode_body(response: httpx.Response) -> object:
@@ -82,26 +109,32 @@ def _decode_body(response: httpx.Response) -> object:
 
     A failure response is often not JSON at all — a gateway may answer with an
     HTML page — and a decode error raised on top of the real failure would hide
-    it. Non-JSON bodies therefore degrade to a trimmed text excerpt.
+    it. Non-JSON bodies therefore degrade to a _NotJson excerpt, which the error
+    path quotes and the success path rejects.
 
     Args:
         response: A response whose content has already been read.
 
     Returns:
-        The decoded JSON value, a trimmed text excerpt, or None for an empty body.
+        The decoded JSON value, a _NotJson marker, or None for an empty body.
     """
     try:
         text = response.text
     except Exception:
         # Broad on purpose: a body we cannot even decode must not mask the real error.
-        return "<undecodable response body>"
+        return _NotJson("<undecodable response body>")
     if not text.strip():
         return None
     try:
         parsed: object = json.loads(text)
     except ValueError:
-        return excerpt(text)
+        return _NotJson(excerpt(text))
     return parsed
+
+
+def _is_success(status: int) -> bool:
+    """Report whether a status is a plain success. 207 is a 2xx but not a success."""
+    return 200 <= status < 300 and status != 207
 
 
 class NettskjemaClient:
@@ -148,17 +181,27 @@ class NettskjemaClient:
             body: Request body. Sent as-is, so a list becomes a bare JSON array.
 
         Returns:
-            The decoded JSON body, or NO_CONTENT_RESULT when the response was empty.
+            The decoded JSON body, or a no-content marker when the body was empty.
 
         Raises:
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
+            UpstreamError: If a successful response carried a body that is not JSON.
         """
         request = await self._build_request(route, path, query, json_body=body)
         response = await self._send(request)
         payload = _decode_body(response)
         self._check_status(route, response, payload)
         if response.status_code == 204 or not response.content:
-            return NO_CONTENT_RESULT
+            return no_content_result(response.status_code)
+        if isinstance(payload, _NotJson):
+            # Reporting success with an HTML login or proxy page as the payload
+            # would be worse than failing: the caller cannot tell it went wrong.
+            raise UpstreamError(
+                f"{route.method} {route.path} answered HTTP {response.status_code} with a "
+                f"{_media_type(response)} body that is not JSON. A proxy or login page "
+                f"most likely answered instead of the API. Body: {payload.text}",
+                status=response.status_code,
+            )
         return payload
 
     async def text(
@@ -184,7 +227,10 @@ class NettskjemaClient:
         """
         request = await self._build_request(route, path, query, accept="text/plain, */*")
         response = await self._send(request)
-        self._check_status(route, response, _decode_body(response))
+        if not _is_success(response.status_code):
+            # Decoding is only worth its cost on the error path: these bodies are
+            # large (an SPSS syntax export is plain text by design, not JSON).
+            self._check_status(route, response, _decode_body(response))
         return response.text
 
     async def ndjson(
@@ -199,9 +245,11 @@ class NettskjemaClient:
         Stream a newline-delimited JSON export, one object per line.
 
         The body is consumed line by line so a large answer export is never held
-        whole in memory. ``truncated`` is True in two cases: the row cap was
-        reached, or the stream ended on a line that is not valid JSON — a cut-off
-        export. A partial final line is reported, never silently included.
+        whole in memory. ``truncated`` is True in two cases, told apart by
+        ``reason``: the row cap was reached (``"rowCap"``), or the connection
+        closed cleanly on a line that is not valid JSON (``"incompleteFinalLine"``).
+        A partial final line is reported, never silently included. A connection
+        that breaks mid-body is a transport failure and raises instead.
 
         Args:
             route: The route to call.
@@ -210,17 +258,18 @@ class NettskjemaClient:
             max_rows: Row cap. Defaults to ``settings.max_answer_rows``.
 
         Returns:
-            ``{"rows": [...], "rowCount": int, "truncated": bool}``.
+            ``{"rows": [...], "rowCount": int, "truncated": bool, "reason": str | None}``.
 
         Raises:
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
+            UpstreamError: If the connection fails while the body is streaming.
         """
         cap = max_rows if max_rows is not None else self._settings.max_answer_rows
         request = await self._build_request(
             route, path, query, accept="application/x-ndjson, application/json"
         )
         rows: list[object] = []
-        truncated = False
+        reason: str | None = None
 
         response = await self._send(request, stream=True)
         try:
@@ -230,7 +279,7 @@ class NettskjemaClient:
                 if not stripped:
                     continue
                 if len(rows) >= cap:
-                    truncated = True
+                    reason = "rowCap"
                     break
                 try:
                     rows.append(json.loads(stripped))
@@ -242,12 +291,21 @@ class NettskjemaClient:
                         route.path,
                         len(rows),
                     )
-                    truncated = True
+                    reason = "incompleteFinalLine"
                     break
+        except httpx.RequestError as exc:
+            # The loop runs after _send has returned, so transport failures land
+            # here rather than in _send and must be translated here too.
+            raise self._transport_error(exc) from exc
         finally:
             await response.aclose()
 
-        return {"rows": rows, "rowCount": len(rows), "truncated": truncated}
+        return {
+            "rows": rows,
+            "rowCount": len(rows),
+            "truncated": reason is not None,
+            "reason": reason,
+        }
 
     async def binary(
         self,
@@ -270,7 +328,10 @@ class NettskjemaClient:
             route: The route to call.
             path: Values for the route's path placeholders.
             query: Query parameters; entries whose value is None are dropped.
-            body: Pre-serialised request body, if the endpoint takes one.
+            body: Pre-serialised request body, if the endpoint takes one. Sent as
+                raw bytes with no content type, so a caller that supplies one must
+                also pass the matching header itself. No route in the current spec
+                needs this; the parameter exists for endpoints that may gain one.
             output_path: Destination file. A temp file is used when omitted.
 
         Returns:
@@ -279,21 +340,34 @@ class NettskjemaClient:
         Raises:
             BadRequestError: If output_path's parent is missing or not writable.
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
+            UpstreamError: If the connection fails while the body is streaming.
         """
         target = _validate_output_path(output_path) if output_path is not None else None
 
         request = await self._build_request(route, path, query, content=body, accept="*/*")
         response = await self._send(request, stream=True)
+        written = 0
+        # The file to clean up if the download does not complete. Set only once
+        # the file is ours: a failure before that must not delete an existing file.
+        partial: Path | None = None
         try:
             await self._check_streamed_status(route, response)
             media_type = _media_type(response)
             if target is None:
                 target = _temp_target(response, media_type)
-            written = 0
+                partial = target
             with target.open("wb") as handle:
+                partial = target
                 async for chunk in response.aiter_bytes():
                     handle.write(chunk)
                     written += len(chunk)
+            partial = None
+        except BaseException as exc:
+            # A half-written export must not be left behind looking complete.
+            _discard_partial(partial)
+            if isinstance(exc, httpx.RequestError):
+                raise self._transport_error(exc) from exc
+            raise
         finally:
             await response.aclose()
 
@@ -344,7 +418,12 @@ class NettskjemaClient:
     ) -> httpx.Request:
         """Build an authenticated request for a route."""
         url = self._url(route, path)
-        token = await self._token_provider().token()
+        try:
+            # Acquiring the token is itself an HTTP call, so it needs the same
+            # translation as the request it is about to authenticate.
+            token = await self._token_provider().token()
+        except httpx.RequestError as exc:
+            raise self._transport_error(exc) from exc
         headers = {"Authorization": f"Bearer {token}", "Accept": accept}
         params = _query_params(query)
         return self._client().build_request(
@@ -360,14 +439,22 @@ class NettskjemaClient:
         """Dispatch a request, translating transport failures into typed errors."""
         try:
             return await self._client().send(request, stream=stream)
-        except httpx.TimeoutException as exc:
-            raise UpstreamError(
-                f"The Nettskjema API did not respond within {self._settings.timeout}s."
-            ) from exc
         except httpx.RequestError as exc:
-            raise UpstreamError(
-                f"Could not reach the Nettskjema API: {type(exc).__name__}."
-            ) from exc
+            raise self._transport_error(exc) from exc
+
+    def _transport_error(self, exc: httpx.RequestError) -> UpstreamError:
+        """
+        Translate an httpx transport failure into a typed error.
+
+        Shared by every stage that touches the network — token acquisition, the
+        request itself, and the streaming loops that run after the response
+        headers have arrived — so httpx exceptions never reach the tool layer.
+        """
+        if isinstance(exc, httpx.TimeoutException):
+            return UpstreamError(
+                f"The Nettskjema API did not respond within {self._settings.timeout}s."
+            )
+        return UpstreamError(f"Could not reach the Nettskjema API: {type(exc).__name__}.")
 
     def _check_status(self, route: Route, response: httpx.Response, payload: object) -> None:
         """
@@ -380,20 +467,19 @@ class NettskjemaClient:
         """
         status = response.status_code
         if status == 207:
-            detail = payload if isinstance(payload, str) else dump(payload)
             raise PartialSuccessError(
                 f"Partial success (HTTP 207) for {route.method} {route.path}: some changes "
-                f"were applied and others were rejected. Response: {excerpt(detail)}",
+                f"were applied and others were rejected. Response: {_detail_text(payload)}",
                 status=207,
                 field_errors=_field_errors(payload),
             )
-        if 200 <= status < 300:
+        if _is_success(status):
             return
         raise error_for_status(status, _error_body(route, response, payload))
 
     async def _check_streamed_status(self, route: Route, response: httpx.Response) -> None:
         """Read and raise on a streamed response that did not succeed."""
-        if response.status_code == 207 or not (200 <= response.status_code < 300):
+        if not _is_success(response.status_code):
             await response.aread()
             self._check_status(route, response, _decode_body(response))
 
@@ -410,9 +496,36 @@ def _error_body(route: Route, response: httpx.Response, payload: object) -> obje
         return payload
     where = f"{route.method} {route.path}"
     reason = response.reason_phrase or "error"
-    if isinstance(payload, str) and payload:
-        return f"HTTP {response.status_code} {reason} from {where}: {payload}"
+    detail = _detail_text(payload)
+    if detail:
+        return f"HTTP {response.status_code} {reason} from {where}: {detail}"
     return f"HTTP {response.status_code} {reason} from {where} (empty response body)."
+
+
+def _detail_text(payload: object) -> str:
+    """Render any decoded body as a bounded single-line excerpt."""
+    if payload is None:
+        return ""
+    if isinstance(payload, _NotJson):
+        return payload.text
+    if isinstance(payload, str):
+        return excerpt(payload)
+    return excerpt(dump(payload))
+
+
+def _discard_partial(target: Path | None) -> None:
+    """
+    Remove a half-written download, best effort.
+
+    Cleanup must never mask the error that caused it, so a failure to unlink is
+    logged and swallowed.
+    """
+    if target is None:
+        return
+    try:
+        target.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.warning("Could not remove the partial download at %s: %s", target, exc)
 
 
 def _query_params(query: dict[str, object] | None) -> list[_QueryParam]:
@@ -527,7 +640,7 @@ def get_client() -> NettskjemaClient:
     Get the process-wide client, creating it on first call.
 
     One instance means one connection pool and one cached access token for the
-    whole server. Use reset_client() to clear the cache (primarily for testing).
+    whole server. Use aclose_client() to tear it down (primarily for testing).
 
     Returns:
         The shared NettskjemaClient instance.
@@ -538,13 +651,27 @@ def get_client() -> NettskjemaClient:
     return _client_cache
 
 
+async def aclose_client() -> None:
+    """
+    Close the pooled client and clear the cache.
+
+    Prefer this over reset_client(): it closes the connection pool it discards.
+    Safe to call when no client was ever created.
+    """
+    global _client_cache
+    if _client_cache is not None:
+        await _client_cache.aclose()
+    _client_cache = None
+
+
 def reset_client() -> None:
     """
-    Clear the pooled client cache.
+    Clear the pooled client cache without closing it.
 
-    This is primarily a test hook, mirroring config.reset_settings(). It does not
-    close the discarded client: closing is async, so callers that created one
-    should await aclose() on it first.
+    This mirrors config.reset_settings() for synchronous call sites such as a
+    pytest fixture that also serves non-async tests. Prefer aclose_client()
+    wherever an await is possible: this one leaves an open connection pool behind
+    if a client was created and never closed.
     """
     global _client_cache
     _client_cache = None
@@ -553,8 +680,10 @@ def reset_client() -> None:
 __all__ = [
     "NO_CONTENT_RESULT",
     "NettskjemaClient",
+    "aclose_client",
     "dump",
     "excerpt",
     "get_client",
+    "no_content_result",
     "reset_client",
 ]

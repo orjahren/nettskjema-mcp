@@ -2,7 +2,9 @@
 
 from collections.abc import Iterator
 
+import httpx
 import pytest
+import respx
 
 from nettskjema_mcp.client import reset_client
 from nettskjema_mcp.config import reset_settings
@@ -37,3 +39,19 @@ def isolated_environment(
     yield
     reset_settings()
     reset_client()
+
+
+@pytest.fixture
+def token_route(respx_mock: respx.MockRouter) -> respx.Route:
+    """
+    Mock the OAuth2 token endpoint.
+
+    Every routed tool acquires a token before its own request, so a tool test
+    that forgets this sees a confusing failure from the auth leg rather than
+    from the endpoint it meant to exercise. Request it explicitly, or pull it
+    in for a whole module with
+    ``pytestmark = pytest.mark.usefixtures("token_route")``.
+    """
+    return respx_mock.post(TEST_AUTH_URL).mock(
+        return_value=httpx.Response(200, json={"access_token": "test-token", "expires_in": 86400})
+    )

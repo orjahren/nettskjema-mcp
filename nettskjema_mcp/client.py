@@ -216,33 +216,37 @@ class NettskjemaClient:
         path: dict[str, object] | None = None,
         query: dict[str, object] | None = None,
         max_chars: int | None = None,
-    ) -> dict[str, object] | str:
+    ) -> dict[str, object]:
         """
-        Call an endpoint and return its body as text.
+        Call an endpoint and return its body as text in an envelope.
 
-        When max_chars is provided, returns an envelope with the text, a truncated
-        flag, total character count, and the truncation reason. Text is cut at the
-        last complete newline before the limit, so CSV and similar formats never
-        break mid-row. When max_chars is None, returns the raw text verbatim for
-        backward compatibility.
+        Returns an envelope with the text, a truncated flag, total character count,
+        and the truncation reason. Text is cut at the last complete newline before
+        the limit, so CSV and similar formats never break mid-row.
 
         Args:
             route: The route to call.
             path: Values for the route's path placeholders.
             query: Query parameters; entries whose value is None are dropped.
-            max_chars: Maximum characters to return. When None, no limit is applied
-                and the raw text is returned. When provided, the envelope is returned
-                instead.
+            max_chars: Maximum characters to return. Defaults to
+                ``settings.max_text_chars``. Must be at least 1 when provided.
 
         Returns:
-            When max_chars is None: the response body as a plain string, verbatim.
-            When max_chars is provided: a dict with text (the response body, possibly
-            truncated at the last newline), truncated (boolean), reason (string or
-            None), and totalChars (the full size before truncation).
+            A dict with text (the response body, possibly truncated at the last
+            newline), truncated (boolean), reason (string or None), and totalChars
+            (the full size before truncation).
 
         Raises:
+            BadRequestError: If max_chars is less than 1.
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
         """
+        if max_chars is not None and max_chars < 1:
+            raise BadRequestError(
+                f"max_chars must be at least 1, got {max_chars}. "
+                "To retrieve the full text, omit max_chars or set it to a large value."
+            )
+        cap = max_chars if max_chars is not None else self._settings.max_text_chars
+
         request = await self._build_request(route, path, query, accept="text/plain, */*")
         response = await self._send(request)
         if not _is_success(response.status_code):
@@ -251,23 +255,17 @@ class NettskjemaClient:
             self._check_status(route, response, _decode_body(response))
 
         full_text = response.text
-
-        # Backward compatibility: if max_chars is None, return raw text
-        if max_chars is None:
-            return full_text
-
-        # Envelope mode: return with metadata
         total_chars = len(full_text)
-        truncated = total_chars > max_chars
+        truncated = total_chars > cap
         reason: str | None = None
         text = full_text
 
         if truncated:
             # Cut at the last complete newline before the limit
-            cut_at = full_text.rfind("\n", 0, max_chars)
+            cut_at = full_text.rfind("\n", 0, cap)
             if cut_at == -1:
                 # No newline found; cut at the character limit
-                text = full_text[:max_chars]
+                text = full_text[:cap]
                 reason = "charCap"
             else:
                 # Include the newline itself

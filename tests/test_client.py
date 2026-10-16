@@ -488,10 +488,10 @@ async def test_binary_rejects_an_unwritable_parent_directory(
         readonly.chmod(stat.S_IRWXU)
 
 
-async def test_text_returns_the_body_unchanged(
+async def test_text_returns_the_body_in_envelope(
     client: NettskjemaClient, respx_mock: respx.MockRouter
 ) -> None:
-    """text returns the raw body, including leading and trailing whitespace."""
+    """text returns an envelope with the text and metadata."""
     syntax = "GET DATA\n  /TYPE=TXT\n  /FILE='answers.csv'\n.\n\n"
     respx_mock.get(f"{BASE_URL}/form/3/spss-syntax").mock(
         return_value=httpx.Response(200, text=syntax, headers={"content-type": "text/plain"})
@@ -499,7 +499,19 @@ async def test_text_returns_the_body_unchanged(
 
     result = await client.text(SPSS_SYNTAX, path={"formId": 3})
 
-    assert result == syntax
+    assert isinstance(result, dict)
+    assert result["text"] == syntax
+    assert result["truncated"] is False
+    assert result["reason"] is None
+    assert result["totalChars"] == len(syntax)
+
+
+async def test_text_rejects_max_chars_less_than_one(client: NettskjemaClient) -> None:
+    """text raises BadRequestError when max_chars is less than 1."""
+    with pytest.raises(BadRequestError) as excinfo:
+        await client.text(SPSS_SYNTAX, path={"formId": 1}, max_chars=0)
+
+    assert "max_chars must be at least 1" in str(excinfo.value)
 
 
 async def test_missing_path_parameter_raises_bad_request(

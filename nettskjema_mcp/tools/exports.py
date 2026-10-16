@@ -12,8 +12,6 @@ merges into it, nor what happens to an entry you omit.
 """
 
 from nettskjema_mcp.client import dump, get_client
-from nettskjema_mcp.config import get_settings
-from nettskjema_mcp.errors import BadRequestError
 from nettskjema_mcp.routes import Route, endpoint
 from nettskjema_mcp.server import tool
 from nettskjema_mcp.validation import validate_body
@@ -24,7 +22,7 @@ SPSS_SYNTAX = Route("GET", "/form/{formId}/spss-syntax")
 CODEBOOK = Route("PUT", "/form/{formId}/codebook")
 
 
-@tool(annotations={"readOnlyHint": True})
+@tool()
 @endpoint(CSV_REPORT)
 async def export_form_csv(
     form_id: int,
@@ -35,12 +33,13 @@ async def export_form_csv(
     """
     Export a form's submission data as CSV.
 
-    The spec documents this as a CSV text file. When output_path is provided, the
-    file is written to disk (mode 0600 for a new file) and the result reports the
-    path, byte count and media type. When output_path is omitted, the text is
-    returned as JSON with a size signal and truncation flag. The result is capped
-    at max_chars (default 1,000,000) to bound context size: check the truncated
-    field to see if the full export was cut.
+    The spec's summary describes the response as a CSV text file with semicolon (;)
+    as the delimiter. When output_path is provided, the file is written to disk
+    (mode 0600 for a new file) and the result reports the path, byte count and
+    media type. When output_path is omitted, the text is returned as JSON with a
+    size signal and truncation flag. The result is capped at max_chars (default
+    1,000,000) to bound context size: check the truncated field to see if the full
+    export was cut.
 
     Args:
         form_id: The form's numeric ID.
@@ -78,22 +77,16 @@ async def export_form_csv(
         )
 
     # Return text in envelope
-    cap = max_chars if max_chars is not None else get_settings().max_text_chars
-    if max_chars is not None and max_chars < 1:
-        raise BadRequestError(
-            f"max_chars must be at least 1, got {max_chars}. "
-            "To retrieve the full export, omit max_chars or set it to a large value."
-        )
     result = await get_client().text(
         CSV_REPORT,
         path={"formId": form_id},
         query={"optimize-for-large-data": optimize_for_large_data},
-        max_chars=cap,
+        max_chars=max_chars,
     )
     return dump(result)
 
 
-@tool(annotations={"readOnlyHint": True})
+@tool()
 @endpoint(EXCEL_REPORT)
 async def export_form_excel(
     form_id: int, output_path: str | None = None, optimize_for_large_data: bool | None = None
@@ -160,13 +153,7 @@ async def get_spss_syntax(form_id: int, max_chars: int | None = None) -> str:
         newline), truncated (boolean), reason (string or null, "charCap" when the
         cap was hit), and totalChars (the full size before truncation).
     """
-    cap = max_chars if max_chars is not None else get_settings().max_text_chars
-    if max_chars is not None and max_chars < 1:
-        raise BadRequestError(
-            f"max_chars must be at least 1, got {max_chars}. "
-            "To retrieve the full syntax, omit max_chars or set it to a large value."
-        )
-    result = await get_client().text(SPSS_SYNTAX, path={"formId": form_id}, max_chars=cap)
+    result = await get_client().text(SPSS_SYNTAX, path={"formId": form_id}, max_chars=max_chars)
     return dump(result)
 
 

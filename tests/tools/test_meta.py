@@ -244,7 +244,19 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
     makes clients prompt for permission it did not need, which trains people to
     click through the prompts that matter. Tools in LOCAL_TOOLS issue no
     request at all and are exempt from both directions.
+
+    Tools that write to the local filesystem are exempt from the gets-only side:
+    they read from the API but can overwrite an arbitrary local file the model
+    names, so they are not read-only in the MCP sense.
     """
+    # Tools exempt from the gets-only → readOnlyHint rule because they write
+    # to local files and can overwrite user data.
+    FILE_WRITERS = {
+        "get_submission_pdf",  # writes PDF to output_path, overwrites existing files
+        "export_form_excel",  # writes Excel to output_path, overwrites existing files
+        "export_form_csv",  # writes CSV to output_path when given, overwrites existing files
+    }
+
     for registered in await mcp.list_tools():
         routes = REGISTRY.get(registered.name)
         if registered.name in LOCAL_TOOLS or routes is None:
@@ -263,6 +275,9 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
                 "exempt it here deliberately rather than dropping the hint"
             )
         else:
+            if registered.name in FILE_WRITERS:
+                # Exempt: writes to local filesystem
+                continue
             assert not gets_only, (
                 f"{registered.name} only issues GETs but is not annotated readOnlyHint; "
                 'add annotations={"readOnlyHint": True}'

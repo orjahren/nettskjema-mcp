@@ -12,6 +12,7 @@ def test_defaults_are_production(monkeypatch: pytest.MonkeyPatch) -> None:
         "NETTSKJEMA_AUTH_URL",
         "NETTSKJEMA_TIMEOUT",
         "NETTSKJEMA_MAX_ANSWER_ROWS",
+        "NETTSKJEMA_MAX_TEXT_CHARS",
         "NETTSKJEMA_LOG_LEVEL",
     ):
         monkeypatch.delenv(k, raising=False)
@@ -21,6 +22,7 @@ def test_defaults_are_production(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.auth_url == "https://authorization.nettskjema.no/oauth2/token"
     assert s.timeout == 30.0
     assert s.max_answer_rows == 1000
+    assert s.max_text_chars == 1000000
     assert s.log_level == "INFO"
 
 

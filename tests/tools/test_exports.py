@@ -339,3 +339,48 @@ async def test_upload_codebook_sends_all_three_maps(respx_mock: respx.MockRouter
     # Verify success marker returned
     parsed = json.loads(result)
     assert parsed == {"status": "success", "httpStatus": 200}
+
+
+async def test_export_form_csv_uses_configured_default_cap(
+    respx_mock: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """export_form_csv() with no max_chars uses NETTSKJEMA_MAX_TEXT_CHARS."""
+    url = f"{TEST_BASE_URL}/form/1/csv-report"
+    large_csv = "Header\n" + ("Row;Data;Values\n" * 100)
+    respx_mock.get(url).mock(return_value=httpx.Response(200, text=large_csv))
+
+    # Set a low configured cap
+    monkeypatch.setenv("NETTSKJEMA_MAX_TEXT_CHARS", "50")
+    # Reset config to pick up the new env var
+    from nettskjema_mcp.config import reset_settings
+
+    reset_settings()
+
+    result = await export_form_csv(1)
+
+    parsed = json.loads(result)
+    assert parsed["truncated"] is True
+    assert parsed["reason"] == "charCap"
+    assert parsed["totalChars"] == len(large_csv)
+    assert len(parsed["text"]) <= 50
+
+
+async def test_export_form_csv_preserves_existing_file_mode(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """export_form_csv() with output_path preserves the mode of an existing file."""
+    url = f"{TEST_BASE_URL}/form/1/csv-report"
+    csv_bytes = CSV_EXPORT.encode("utf-8")
+    respx_mock.get(url).mock(return_value=httpx.Response(200, content=csv_bytes))
+
+    # Create existing file with mode 0644
+    output_file = tmp_path / "existing.csv"
+    output_file.write_bytes(b"old content")
+    output_file.chmod(0o644)
+
+    await export_form_csv(1, output_path=str(output_file))
+
+    # Mode should be preserved
+    assert (output_file.stat().st_mode & 0o777) == 0o644
+    # Content should be replaced
+    assert output_file.read_bytes() == csv_bytes

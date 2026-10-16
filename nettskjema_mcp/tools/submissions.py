@@ -89,7 +89,7 @@ async def list_my_submissions() -> str:
     return dump(await get_client().json(LIST_MY_SUBMISSIONS))
 
 
-@tool(annotations={"readOnlyHint": True})
+@tool()
 @endpoint(GET_SUBMISSION_PDF)
 async def get_submission_pdf(submission_id: int, output_path: str | None = None) -> str:
     """

@@ -35,7 +35,11 @@ TRANSCRIBED_VTT_RESPONSE = """WEBVTT
 00:00:00.000 --> 00:00:02.500
 This is a transcription."""
 
-ATTACHMENT_CONTENT = b"fake audio file content"
+# Fixture for the upload's 200 response (string map)
+UPLOAD_SUCCESS_RESPONSE = {"fileId": "abc123", "status": "uploaded"}
+
+# Binary content with NUL and invalid UTF-8 to pin fidelity
+ATTACHMENT_CONTENT = b"\x00\xff\xfe fake \xc3\x28 audio file content"
 
 
 async def test_get_answer_attachment_writes_to_file(
@@ -225,10 +229,10 @@ async def test_get_attachment_transcription_selects_the_route_by_format(
     ).mock(return_value=httpx.Response(200, json=TRANSCRIBED_JSON_RESPONSE))
     txt_route = respx_mock.get(
         f"{TEST_BASE_URL}/submission/attachment/123/transcribed/txt"
-    ).mock(return_value=httpx.Response(200, json=TRANSCRIBED_TXT_RESPONSE))
+    ).mock(return_value=httpx.Response(200, text=TRANSCRIBED_TXT_RESPONSE))
     vtt_route = respx_mock.get(
         f"{TEST_BASE_URL}/submission/attachment/123/transcribed/vtt"
-    ).mock(return_value=httpx.Response(200, json=TRANSCRIBED_VTT_RESPONSE))
+    ).mock(return_value=httpx.Response(200, text=TRANSCRIBED_VTT_RESPONSE))
 
     # Test JSON format
     result_json = await get_attachment_transcription(123, format="json")
@@ -239,12 +243,18 @@ async def test_get_attachment_transcription_selects_the_route_by_format(
     assert parsed["text"] == "This is a transcription."
 
     # Test TXT format
-    await get_attachment_transcription(123, format="txt")
+    result_txt = await get_attachment_transcription(123, format="txt")
     assert txt_route.call_count == 1
+    parsed_txt = json.loads(result_txt)
+    assert parsed_txt["text"] == TRANSCRIBED_TXT_RESPONSE
+    assert parsed_txt["truncated"] is False
 
     # Test VTT format
-    await get_attachment_transcription(123, format="vtt")
+    result_vtt = await get_attachment_transcription(123, format="vtt")
     assert vtt_route.call_count == 1
+    parsed_vtt = json.loads(result_vtt)
+    assert parsed_vtt["text"] == TRANSCRIBED_VTT_RESPONSE
+    assert parsed_vtt["truncated"] is False
 
 
 async def test_get_attachment_transcription_declares_all_three_routes() -> None:
@@ -309,3 +319,139 @@ async def test_retranscribe_rejects_an_unknown_language(
     # The error should mention validation failure
     error_msg = str(excinfo.value)
     assert "TranscribeDTO" in error_msg or "language" in error_msg
+
+
+async def test_upload_validates_model_before_sending(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """upload_submission_attachment() validates model against TranscribeDTO."""
+    url = f"{TEST_BASE_URL}/form/submission/1/attachment"
+    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+
+    test_file = tmp_path / "upload.mp3"
+    test_file.write_bytes(ATTACHMENT_CONTENT)
+
+    with pytest.raises(ToolError) as excinfo:
+        await upload_submission_attachment(
+            submission_id=1,
+            question_id=42,
+            file_path=str(test_file),
+            attachment_token="test-token",
+            model="unknown_model",
+        )
+
+    assert route.call_count == 0
+    error_msg = str(excinfo.value)
+    assert "model_auto" in error_msg or "TranscribeDTO" in error_msg
+
+
+async def test_upload_validates_language_before_sending(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """upload_submission_attachment() validates language against TranscribeDTO."""
+    url = f"{TEST_BASE_URL}/form/submission/1/attachment"
+    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+
+    test_file = tmp_path / "upload.mp3"
+    test_file.write_bytes(ATTACHMENT_CONTENT)
+
+    with pytest.raises(ToolError) as excinfo:
+        await upload_submission_attachment(
+            submission_id=1,
+            question_id=42,
+            file_path=str(test_file),
+            attachment_token="test-token",
+            language="invalid_lang",
+        )
+
+    assert route.call_count == 0
+    error_msg = str(excinfo.value)
+    assert "TranscribeDTO" in error_msg or "language" in error_msg
+
+
+async def test_upload_rejects_token_with_control_characters(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """upload_submission_attachment() rejects tokens with CR, LF, or NUL."""
+    url = f"{TEST_BASE_URL}/form/submission/1/attachment"
+    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+
+    test_file = tmp_path / "upload.mp3"
+    test_file.write_bytes(ATTACHMENT_CONTENT)
+
+    with pytest.raises(ToolError) as excinfo:
+        await upload_submission_attachment(
+            submission_id=1,
+            question_id=42,
+            file_path=str(test_file),
+            attachment_token="sekret\nX-Evil: 1",
+        )
+
+    assert route.call_count == 0
+    error_msg = str(excinfo.value)
+    assert "control characters" in error_msg
+    # The token value must not appear in the error message
+    assert "sekret" not in error_msg
+    assert "X-Evil" not in error_msg
+
+
+@pytest.mark.parametrize(
+    "param_name,param_value,query_key,query_value",
+    [
+        ("model", "model_auto", "model", "model_auto"),
+        ("language", "en", "language", "en"),
+        ("diarize", True, "diarize", "true"),
+        ("translate_to_english", True, "translate-to-english", "true"),
+    ],
+)
+async def test_upload_query_parameters(
+    respx_mock: respx.MockRouter,
+    tmp_path: Path,
+    param_name: str,
+    param_value: object,
+    query_key: str,
+    query_value: str,
+) -> None:
+    """upload_submission_attachment() sends all transcription options as query params."""
+    url = f"{TEST_BASE_URL}/form/submission/1/attachment"
+    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+
+    test_file = tmp_path / "upload.mp3"
+    test_file.write_bytes(ATTACHMENT_CONTENT)
+
+    await upload_submission_attachment(
+        submission_id=1,
+        question_id=42,
+        file_path=str(test_file),
+        attachment_token="test-token",
+        **{param_name: param_value},
+    )
+
+    assert route.call_count == 1
+    request = route.calls.last.request
+    query_params = dict(request.url.params)
+    assert query_params[query_key] == query_value
+
+
+async def test_upload_returns_200_response_body(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """upload_submission_attachment() returns the 200 response body verbatim."""
+    url = f"{TEST_BASE_URL}/form/submission/1/attachment"
+    route = respx_mock.put(url).mock(
+        return_value=httpx.Response(200, json=UPLOAD_SUCCESS_RESPONSE)
+    )
+
+    test_file = tmp_path / "upload.mp3"
+    test_file.write_bytes(ATTACHMENT_CONTENT)
+
+    result = await upload_submission_attachment(
+        submission_id=1,
+        question_id=42,
+        file_path=str(test_file),
+        attachment_token="test-token",
+    )
+
+    assert route.call_count == 1
+    parsed = json.loads(result)
+    assert parsed == UPLOAD_SUCCESS_RESPONSE

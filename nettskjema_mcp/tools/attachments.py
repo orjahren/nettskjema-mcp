@@ -1,20 +1,22 @@
 """Attachment download, upload, and transcription tools.
 
-Attachment uploads stream the entire file into memory as bytes before sending,
-because the API requires the fileSize as a query parameter derived from the file.
-A long audio recording awaiting transcription can be tens of megabytes; the whole
-file is held in RAM during the upload.
+Attachment uploads read the entire file into memory as bytes before sending. The
+fileSize query parameter is derived from the file so httpx can set an accurate
+Content-Length header instead of falling back to chunked transfer encoding. A long
+audio recording awaiting transcription can be tens of megabytes; the whole file is
+held in RAM during the upload.
 
 The attachment token authorizes writing to someone else's submission. It is a
 credential and must never appear in a log line, an exception message, or a
 returned dict — the same rule the access token and the client secret already have.
 """
 
+import re
 from pathlib import Path
 from typing import Literal
 
 from nettskjema_mcp.client import dump, get_client
-from nettskjema_mcp.errors import NotFoundError
+from nettskjema_mcp.errors import BadRequestError, NotFoundError
 from nettskjema_mcp.routes import Route, endpoint
 from nettskjema_mcp.server import tool
 from nettskjema_mcp.validation import validate_body
@@ -82,11 +84,10 @@ async def upload_submission_attachment(
     """
     Upload an attachment to a submission question, optionally requesting transcription.
 
-    The entire file is read into memory before uploading because the API requires
-    fileSize as a query parameter. The filename and fileSize are derived from the
-    file itself rather than accepted as parameters, so they cannot drift out of sync.
-    An audio recording awaiting transcription can be tens of megabytes; the whole
-    file is held in RAM during the upload.
+    The entire file is read into memory before uploading. The filename and fileSize
+    are derived from the file itself rather than accepted as parameters, so they
+    cannot drift out of sync. An audio recording awaiting transcription can be tens
+    of megabytes; the whole file is held in RAM during the upload.
 
     The attachment token comes from the attachmentToken field in the response body
     of POST /form/{formId}/submission. It authorizes writing to someone else's
@@ -115,9 +116,19 @@ async def upload_submission_attachment(
         translate_to_english: Request translation to English after transcription.
 
     Returns:
-        A success marker as JSON: {"status": "success", "httpStatus": <code>}.
-        The spec declares no response body for this operation.
+        On HTTP 200, a JSON object with string keys and string values (the spec
+        declares {"type": "object", "additionalProperties": {"type": "string"}}).
+        On HTTP 204, a success marker: {"status": "success", "httpStatus": 204}.
     """
+    # Reject tokens containing control characters (prevents header injection and
+    # keeps malformed tokens out of exception chains that may leak via tracebacks)
+    if re.search(r"[\x00-\x1f\x7f]", attachment_token):
+        raise BadRequestError(
+            "The attachment token contains control characters and cannot be used. "
+            "The token must be a clean string value without CR, LF, NUL, or other "
+            "control characters."
+        )
+
     # Expand and resolve the path, then check the file exists
     path = Path(file_path).expanduser().resolve()
     if not path.exists():
@@ -129,6 +140,16 @@ async def upload_submission_attachment(
         raise NotFoundError(
             f"Cannot upload {file_path!r}: that path is not a file (it may be a directory)."
         )
+
+    # Validate transcription options against TranscribeDTO before building the request.
+    # This dict is used purely as an enum oracle; the actual request body is file bytes.
+    transcribe_opts: dict[str, object] = {}
+    if model is not None:
+        transcribe_opts["model"] = model
+    if language is not None:
+        transcribe_opts["language"] = language
+    if transcribe_opts:
+        validate_body("TranscribeDTO", transcribe_opts)
 
     # Read the entire file into memory
     content = path.read_bytes()
@@ -180,7 +201,9 @@ async def get_attachment_transcription(
             (plain text), or "vtt" (WebVTT subtitle format).
 
     Returns:
-        The transcription in the requested format, as a JSON string.
+        The transcription in the requested format. For "json", a JSON object with
+        the transcription data. For "txt" and "vtt", the text in an envelope with
+        a size signal and truncation flag.
     """
     route_map = {
         "json": TRANSCRIBED_JSON,
@@ -188,11 +211,20 @@ async def get_attachment_transcription(
         "vtt": TRANSCRIBED_VTT,
     }
     selected_route = route_map[format]
-    result = await get_client().json(
-        selected_route,
-        path={"answerAttachmentId": answer_attachment_id},
-    )
-    return dump(result)
+
+    if format == "json":
+        result = await get_client().json(
+            selected_route,
+            path={"answerAttachmentId": answer_attachment_id},
+        )
+        return dump(result)
+    else:
+        # txt and vtt are plain text formats, not JSON
+        result = await get_client().text(
+            selected_route,
+            path={"answerAttachmentId": answer_attachment_id},
+        )
+        return dump(result)
 
 
 @tool(annotations={"destructiveHint": True})

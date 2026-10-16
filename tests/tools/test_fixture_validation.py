@@ -26,6 +26,7 @@ import tests.tools
 from tests.conftest import validate_response_fixture
 
 # Import all fixtures from test modules
+from tests.tools.test_attachments import UPLOAD_SUCCESS_RESPONSE
 from tests.tools.test_elements import REJECTION_BODY, THREE_ELEMENTS
 from tests.tools.test_forms_read import (
     FORM_DEFINITION,
@@ -62,6 +63,12 @@ ALL_FIXTURES: list[tuple[str, str, Any, str]] = [
         DELIVERED_SUBMISSION,
         "DELIVERED_SUBMISSION",
     ),
+    (
+        "PUT",
+        "/form/submission/{submissionId}/attachment",
+        UPLOAD_SUCCESS_RESPONSE,
+        "UPLOAD_SUCCESS_RESPONSE",
+    ),
 ]
 
 # Module-level JSON constants that are not response fixtures, with the reason.
@@ -73,7 +80,7 @@ DISCOVERY_EXEMPT: dict[tuple[str, str], str] = {
     (
         "test_attachments",
         "TRANSCRIBED_JSON_RESPONSE",
-    ): "Synthetic fixture for a route with no documented response schema",
+    ): "Real response body, but the route's 200 declares no content, so there is nothing to validate against",
 }
 
 

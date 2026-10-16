@@ -14,7 +14,7 @@ from nettskjema_mcp.enums import (
     RespondentGroup,
     ScoreResultDisplayType,
 )
-from nettskjema_mcp.routes import REGISTRY, OUT_OF_SCOPE, load_spec
+from nettskjema_mcp.routes import REGISTRY, OUT_OF_SCOPE, Route, endpoint, load_spec
 
 
 def _spec_enum(spec: dict[str, object], schema: str, prop: str) -> list[str]:
@@ -84,3 +84,31 @@ def test_enum_members_match_the_spec(
     """Verify enum members match the spec definition."""
     declared = _spec_enum(load_spec(), schema, prop)
     assert [e.value for e in enum_cls] == declared  # type: ignore[attr-defined]
+
+
+def test_endpoint_duplicate_registration_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that registering the same tool name twice raises ValueError."""
+    # Use a fresh registry to avoid polluting the global one
+    test_registry: dict[str, tuple[Route, ...]] = {}
+    monkeypatch.setattr("nettskjema_mcp.routes.REGISTRY", test_registry)
+
+    # First registration succeeds
+    @endpoint(Route("GET", "/test"))
+    def my_tool() -> None:
+        pass
+
+    assert "my_tool" in test_registry
+
+    # Second registration with the same name fails
+    with pytest.raises(ValueError, match="my_tool"):
+
+        @endpoint(Route("POST", "/other"))
+        def my_tool() -> None:  # noqa: F811
+            pass
+
+
+def test_load_spec_returns_cached_identity() -> None:
+    """Verify load_spec() returns the same cached object (read-only contract)."""
+    # The spec is cached and shared — callers must not mutate it.
+    # See load_spec() docstring for the read-only contract.
+    assert load_spec() is load_spec()

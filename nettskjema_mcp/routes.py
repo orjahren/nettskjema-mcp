@@ -77,11 +77,13 @@ def load_spec() -> dict[str, Any]:
     """
     Load the vendored OpenAPI spec.
 
-    The spec is cached after first load. Returns the full spec document
-    as a dictionary.
+    The spec is cached after first load and the same dict instance is returned
+    on every call. The returned mapping is a shared, cached, **read-only** view:
+    callers must not mutate it or anything reachable from it. If mutation is
+    needed, copy first.
 
     Returns:
-        The OpenAPI spec as a dictionary
+        The OpenAPI spec as a dictionary (shared, read-only)
     """
     spec_file = files("nettskjema_mcp.spec").joinpath("openapi.json")
     with spec_file.open("r", encoding="utf-8") as f:

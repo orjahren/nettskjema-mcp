@@ -1,6 +1,8 @@
 """Tests for error handling module."""
 
 import pytest
+from fastmcp.exceptions import ToolError as FastMCPToolError
+
 from nettskjema_mcp.errors import (
     AuthenticationError,
     BadRequestError,
@@ -12,6 +14,7 @@ from nettskjema_mcp.errors import (
     PartialSuccessError,
     UpstreamError,
     error_for_status,
+    to_tool_error,
 )
 
 
@@ -54,3 +57,11 @@ def test_forbidden_names_the_permission_step() -> None:
 def test_unmapped_status_falls_back_to_base_error() -> None:
     """Unmapped status codes should return the base NettskjemaError."""
     assert type(error_for_status(418, {})) is NettskjemaError
+
+
+def test_to_tool_error_returns_fastmcp_tool_error() -> None:
+    """to_tool_error should return fastmcp.exceptions.ToolError."""
+    exc = error_for_status(400, {"message": "bad request"})
+    tool_error = to_tool_error(exc)
+    assert isinstance(tool_error, FastMCPToolError)
+    assert str(exc) in str(tool_error)

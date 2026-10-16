@@ -1,10 +1,8 @@
 """Error types for Nettskjema API interactions."""
 
+from fastmcp.exceptions import ToolError
+
 from nettskjema_mcp.config import get_settings
-
-
-class ToolError(Exception):
-    """Error to be raised by MCP tool implementations."""
 
 
 class NettskjemaError(Exception):

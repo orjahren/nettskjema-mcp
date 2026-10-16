@@ -89,3 +89,5 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+# Exclude legacy monolith; Task 6 removes both the file and this exclusion
+exclude = ["nettskjema_mcp/__init__.py"]

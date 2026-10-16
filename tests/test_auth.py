@@ -8,7 +8,7 @@ import respx
 
 from nettskjema_mcp import auth
 from nettskjema_mcp.config import Settings, reset_settings
-from nettskjema_mcp.errors import AuthenticationError
+from nettskjema_mcp.errors import AuthenticationError, UpstreamError
 
 
 @pytest.fixture
@@ -194,6 +194,81 @@ async def test_401_from_token_endpoint_raises_authentication_error(settings: Set
 
             with pytest.raises(AuthenticationError):
                 await provider.token()
+
+
+@pytest.mark.parametrize("status", [500, 502, 503])
+async def test_server_error_from_token_endpoint_raises_upstream_error(
+    settings: Settings, status: int
+) -> None:
+    """An outage at the authorization server must not escape as a raw httpx error."""
+    with respx.mock:
+        respx.post("https://authorization.nettskjema.no/oauth2/token").mock(
+            return_value=httpx.Response(
+                status,
+                headers={"content-type": "text/html"},
+                text="<html><body><h1>Service Unavailable</h1></body></html>",
+            )
+        )
+
+        async with httpx.AsyncClient() as client:
+            provider = auth.TokenProvider(client, settings)
+
+            with pytest.raises(UpstreamError) as excinfo:
+                await provider.token()
+
+    message = str(excinfo.value)
+    assert excinfo.value.status == status
+    assert str(status) in message
+    assert "Service Unavailable" in message
+    # The credentials travel in the Authorization header and must never be echoed.
+    assert "test-secret" not in message
+    assert "dGVzdC1jbGllbnQ6dGVzdC1zZWNyZXQ=" not in message
+
+
+async def test_bad_request_from_token_endpoint_raises_authentication_error(
+    settings: Settings,
+) -> None:
+    """A 4xx means the client or its credentials were refused, not an outage."""
+    with respx.mock:
+        respx.post("https://authorization.nettskjema.no/oauth2/token").mock(
+            return_value=httpx.Response(
+                400,
+                json={
+                    "error": "unauthorized_client",
+                    "error_description": "client_credentials grant not allowed",
+                },
+            )
+        )
+
+        async with httpx.AsyncClient() as client:
+            provider = auth.TokenProvider(client, settings)
+
+            with pytest.raises(AuthenticationError) as excinfo:
+                await provider.token()
+
+    message = str(excinfo.value)
+    assert excinfo.value.status == 400
+    assert "unauthorized_client" in message
+    assert "client_credentials grant not allowed" in message
+    assert "test-secret" not in message
+    # The 403 guidance about form editing permissions belongs to the API, not here.
+    assert "Editing permissions" not in message
+
+
+async def test_token_error_excerpt_is_bounded(settings: Settings) -> None:
+    """A huge outage page is trimmed rather than quoted whole."""
+    with respx.mock:
+        respx.post("https://authorization.nettskjema.no/oauth2/token").mock(
+            return_value=httpx.Response(503, text="<p>padding</p>" * 500)
+        )
+
+        async with httpx.AsyncClient() as client:
+            provider = auth.TokenProvider(client, settings)
+
+            with pytest.raises(UpstreamError) as excinfo:
+                await provider.token()
+
+    assert len(str(excinfo.value)) < auth.AUTH_ERROR_EXCERPT_LIMIT + 300
 
 
 async def test_invalidate_forces_a_refetch(settings: Settings) -> None:

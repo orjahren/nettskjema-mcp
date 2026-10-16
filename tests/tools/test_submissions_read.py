@@ -277,3 +277,59 @@ async def test_get_submission_pdf_relative_path_resolved_to_absolute(
     assert returned_path.name == "relative.pdf"
     assert returned_path.exists()
     assert returned_path.read_bytes() == pdf_content
+
+
+async def test_get_submission_pdf_new_file_mode_0600(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """get_submission_pdf() creates new files with mode 0600."""
+    url = f"{TEST_BASE_URL}/form/submission/123/pdf"
+    pdf_content = b"%PDF-1.4\ntest pdf content"
+    route = respx_mock.get(url).mock(
+        return_value=httpx.Response(
+            200,
+            content=pdf_content,
+            headers={"content-type": "application/pdf"},
+        )
+    )
+
+    output_file = tmp_path / "new_submission.pdf"
+    assert not output_file.exists()
+
+    await get_submission_pdf(123, output_path=str(output_file))
+
+    assert route.call_count == 1
+    assert output_file.exists()
+    # Check mode is 0600 (owner read/write only)
+    mode = output_file.stat().st_mode & 0o777
+    assert mode == 0o600, f"Expected mode 0600, got {oct(mode)}"
+
+
+async def test_get_submission_pdf_preserves_existing_file_mode(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """get_submission_pdf() preserves mode of existing files."""
+    url = f"{TEST_BASE_URL}/form/submission/123/pdf"
+    pdf_content = b"%PDF-1.4\ntest pdf content"
+    route = respx_mock.get(url).mock(
+        return_value=httpx.Response(
+            200,
+            content=pdf_content,
+            headers={"content-type": "application/pdf"},
+        )
+    )
+
+    output_file = tmp_path / "existing_submission.pdf"
+    # Create file with mode 0644 (common default)
+    output_file.write_bytes(b"old content")
+    output_file.chmod(0o644)
+    original_mode = output_file.stat().st_mode & 0o777
+    assert original_mode == 0o644
+
+    await get_submission_pdf(123, output_path=str(output_file))
+
+    assert route.call_count == 1
+    # Mode should be preserved
+    final_mode = output_file.stat().st_mode & 0o777
+    assert final_mode == 0o644, f"Expected mode 0644 preserved, got {oct(final_mode)}"
+    assert output_file.read_bytes() == pdf_content

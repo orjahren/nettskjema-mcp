@@ -23,8 +23,15 @@ pytestmark = [
 ]
 
 FORMS = [{"formId": 1, "title": "Test Form"}]
-FORM_METADATA = {"formId": 1, "title": "Test Form", "titleShort": "test-form"}
-FORM_INFO = {"owner": "test-client@apiclient", "created": "2024-01-01T00:00:00Z"}
+# lookup_form_by_title returns a map of string keys to integer formId values
+FORM_METADATA = {"test-form": 123}
+# FormInfoDTO properties
+FORM_INFO = {
+    "title": "Test Form",
+    "isOpen": True,
+    "canEditForm": True,
+    "numberOfSubmissions": 0,
+}
 FORM_SETTINGS = {
     "title": "Test Form",
     "formType": "DEFAULT",
@@ -33,9 +40,17 @@ FORM_SETTINGS = {
     "collectsPersonalData": False,
     "sensitivePersonalDataCollected": False,
 }
-FORM_VALIDATION = {"titleRequired": True}
+# ErrorMessage schema for validation endpoint
+FORM_VALIDATION = {"message": "Validation passed", "errors": {}}
 FORM_DEFINITION = {"elements": [{"elementId": 1, "elementType": "TEXT"}]}
-PERSONAL_DATA_FORMS = [{"formId": 1, "collectsPersonalData": True}]
+# FormCollectPersonalDataDTO properties (no 'collectsPersonalData' property)
+PERSONAL_DATA_FORMS = [
+    {
+        "formId": 1,
+        "title": "Test Form",
+        "sensitivePersonalDataCollected": False,
+    }
+]
 
 
 async def test_list_my_forms(respx_mock: respx.MockRouter) -> None:

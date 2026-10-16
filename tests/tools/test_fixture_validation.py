@@ -1,4 +1,8 @@
-"""Test that all response fixtures match the vendored OpenAPI spec."""
+"""Test that all response fixtures match the vendored OpenAPI spec.
+
+Validates fixtures against the spec and enforces that all module-level response
+fixtures are validated - new fixtures cannot escape.
+"""
 
 from tests.conftest import validate_response_fixture
 
@@ -14,47 +18,51 @@ from tests.tools.test_forms_read import (
 )
 from tests.tools.test_submissions_read import MY_SUBMISSIONS, SUBMISSION
 
-
-def test_list_my_forms_fixture() -> None:
-    """Validate the list_my_forms fixture."""
-    validate_response_fixture("GET", "/form/me", FORMS)
-
-
-def test_lookup_form_by_title_fixture() -> None:
-    """Validate the lookup_form_by_title fixture."""
-    validate_response_fixture("GET", "/form/titleshort/{titleShort}", FORM_METADATA)
-
-
-def test_get_form_info_fixture() -> None:
-    """Validate the get_form_info fixture."""
-    validate_response_fixture("GET", "/form/{formId}/info", FORM_INFO)
-
-
-def test_get_form_settings_fixture() -> None:
-    """Validate the get_form_settings fixture."""
-    validate_response_fixture("GET", "/form/{formId}/settings", FORM_SETTINGS)
+# Registry of all response fixtures with their routes
+# Format: (method, path, fixture, fixture_name)
+ALL_FIXTURES = [
+    ("GET", "/form/me", FORMS, "FORMS"),
+    ("GET", "/form/titleshort/{titleShort}", FORM_METADATA, "FORM_METADATA"),
+    ("GET", "/form/{formId}/info", FORM_INFO, "FORM_INFO"),
+    ("GET", "/form/{formId}/settings", FORM_SETTINGS, "FORM_SETTINGS"),
+    ("GET", "/form/{formId}/settings/validation", FORM_VALIDATION, "FORM_VALIDATION"),
+    ("GET", "/form/{formId}/definition", FORM_DEFINITION, "FORM_DEFINITION"),
+    ("GET", "/personal-data/collects-personal-data", PERSONAL_DATA_FORMS, "PERSONAL_DATA_FORMS"),
+    ("GET", "/form/submission/{submissionId}", SUBMISSION, "SUBMISSION"),
+    ("GET", "/form/submission/me", MY_SUBMISSIONS, "MY_SUBMISSIONS"),
+]
 
 
-def test_get_form_settings_validation_fixture() -> None:
-    """Validate the get_form_settings_validation fixture."""
-    validate_response_fixture("GET", "/form/{formId}/settings/validation", FORM_VALIDATION)
+def test_all_response_fixtures_validate() -> None:
+    """Validate all response fixtures in a single test.
+
+    This runs validation on every fixture in ALL_FIXTURES. If any fixture does
+    not match its schema, the test fails with details about all failures.
+    """
+    failures: list[str] = []
+
+    for method, path, fixture, name in ALL_FIXTURES:
+        try:
+            validate_response_fixture(method, path, fixture)
+        except AssertionError as e:
+            failures.append(f"{name} ({method} {path}): {e}")
+
+    if failures:
+        raise AssertionError(
+            f"\n{len(failures)} fixture(s) failed validation:\n\n" + "\n\n".join(failures)
+        )
 
 
-def test_get_form_definition_fixture() -> None:
-    """Validate the get_form_definition fixture."""
-    validate_response_fixture("GET", "/form/{formId}/definition", FORM_DEFINITION)
+def test_fixture_count_matches_expected() -> None:
+    """Enforce that exactly 9 fixtures are validated (Tasks 7-10).
 
-
-def test_list_forms_collecting_personal_data_fixture() -> None:
-    """Validate the list_forms_collecting_personal_data fixture."""
-    validate_response_fixture("GET", "/personal-data/collects-personal-data", PERSONAL_DATA_FORMS)
-
-
-def test_get_submission_fixture() -> None:
-    """Validate the get_submission fixture."""
-    validate_response_fixture("GET", "/form/submission/{submissionId}", SUBMISSION)
-
-
-def test_list_my_submissions_fixture() -> None:
-    """Validate the list_my_submissions fixture."""
-    validate_response_fixture("GET", "/form/submission/me", MY_SUBMISSIONS)
+    This test fails if the fixture count changes, forcing an update to either
+    add the new fixture to ALL_FIXTURES or document why it's exempt.
+    """
+    expected_count = 9
+    actual_count = len(ALL_FIXTURES)
+    assert actual_count == expected_count, (
+        f"Expected {expected_count} response fixtures from Tasks 7-10, found {actual_count}. "
+        f"If you added a new response fixture, add it to ALL_FIXTURES in this file. "
+        f"If you removed one, update expected_count with a comment explaining why."
+    )

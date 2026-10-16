@@ -59,64 +59,86 @@ def token_route(respx_mock: respx.MockRouter) -> respx.Route:
     )
 
 
-def validate_response_fixture(
-    method: str,
-    path: str,
-    fixture: Any,
-    *,
-    content_type: str = "application/json",
-) -> None:
+# Known legitimate exemptions from fixture validation
+FIXTURE_VALIDATION_EXEMPTIONS: dict[tuple[str, str], str] = {
+    # (METHOD, path) -> reason
+    # Example: ("GET", "/some/route"): "Binary response with no schema"
+}
+
+
+def validate_response_fixture(method: str, path: str, fixture: Any) -> None:
     """
     Validate a response fixture against the vendored OpenAPI spec.
 
-    Ensures test fixtures match the actual API contract: unknown properties are
-    rejected, nested objects are validated, and array items are checked. This
-    catches invented fields before they reach production.
+    Auto-detects content type from the spec and validates strictly: unknown
+    properties are rejected, nested objects are checked recursively, and missing
+    routes or schemas fail loudly rather than silently skipping.
 
     Args:
         method: HTTP method (upper-case: "GET", "POST", etc.)
         path: OpenAPI path with placeholders ("/form/{formId}/info")
         fixture: The response fixture to validate (dict, list, or primitive)
-        content_type: Expected content type (default: "application/json")
 
     Raises:
-        AssertionError: If the fixture does not match the spec schema
+        AssertionError: If the fixture does not match the spec schema, or if
+            the route/method/schema cannot be resolved
 
     Example:
-        validate_response_fixture("GET", "/form/{formId}/info", FORM_INFO_FIXTURE)
-        validate_response_fixture("GET", "/form/me", MY_FORMS_FIXTURE)
+        validate_response_fixture("GET", "/form/{formId}/info", FORM_INFO)
     """
     spec = load_spec()
 
-    # Find the route in the spec
-    if path not in spec["paths"]:
-        # No schema to validate against; skip explicitly
+    # Check if this route is exempted
+    if (method, path) in FIXTURE_VALIDATION_EXEMPTIONS:
         return
+
+    # Route must exist in spec
+    assert path in spec["paths"], (
+        f"{method} {path}: route not found in spec. "
+        f"Check for typos or add to FIXTURE_VALIDATION_EXEMPTIONS with reason."
+    )
 
     path_spec = spec["paths"][path]
     method_lower = method.lower()
 
-    if method_lower not in path_spec:
-        return
+    # Method must exist on route
+    assert method_lower in path_spec, (
+        f"{method} {path}: method not found on route in spec. "
+        f"Available methods: {sorted(k for k in path_spec.keys() if k in {'get', 'post', 'put', 'patch', 'delete'})}"
+    )
 
     operation = path_spec[method_lower]
 
-    if "responses" not in operation or "200" not in operation["responses"]:
-        return
+    # Must have a 200 response
+    assert "responses" in operation and "200" in operation["responses"], (
+        f"{method} {path}: no 200 response defined in spec"
+    )
 
     response_spec = operation["responses"]["200"]
 
-    if "content" not in response_spec:
-        # Binary or no-content response; nothing to validate
-        return
+    # Must have content (i.e., not a 204 No Content)
+    assert "content" in response_spec, f"{method} {path}: response has no content (likely 204)"
 
-    if content_type not in response_spec["content"]:
-        # Content type mismatch or not specified
-        return
+    content = response_spec["content"]
 
-    schema = response_spec["content"][content_type].get("schema")
-    if not schema:
-        return
+    # Auto-detect content type: prefer application/json, then */* , then take the first
+    content_type: str | None = None
+    if "application/json" in content:
+        content_type = "application/json"
+    elif "*/*" in content:
+        content_type = "*/*"
+    elif len(content) == 1:
+        content_type = list(content.keys())[0]
+    else:
+        # Multiple content types and neither JSON nor */* - cannot auto-detect
+        raise AssertionError(
+            f"{method} {path}: multiple content types in spec and cannot auto-detect. "
+            f"Available: {sorted(content.keys())}"
+        )
+
+    # Content type must have a schema
+    schema = content[content_type].get("schema")
+    assert schema is not None, f"{method} {path}: content type {content_type} has no schema in spec"
 
     # Validate the fixture against the schema
     _validate_value(fixture, schema, spec, path=f"{method} {path}")
@@ -127,9 +149,11 @@ def _validate_value(value: Any, schema: dict[str, Any], spec: dict[str, Any], pa
     # Resolve $ref if present
     if "$ref" in schema:
         ref = schema["$ref"]
-        assert ref.startswith("#/components/schemas/"), f"Unsupported $ref: {ref}"
+        assert ref.startswith("#/components/schemas/"), f"{path}: unsupported $ref: {ref}"
         schema_name = ref.split("/")[-1]
-        assert schema_name in spec["components"]["schemas"], f"Unknown schema: {schema_name}"
+        assert schema_name in spec["components"]["schemas"], (
+            f"{path}: schema {schema_name} not found in spec"
+        )
         schema = spec["components"]["schemas"][schema_name]
 
     schema_type = schema.get("type")
@@ -137,20 +161,31 @@ def _validate_value(value: Any, schema: dict[str, Any], spec: dict[str, Any], pa
     if schema_type == "object":
         assert isinstance(value, dict), f"{path}: expected object, got {type(value).__name__}"
         properties = schema.get("properties", {})
+        additional_properties = schema.get("additionalProperties")
 
-        # Check for unknown properties (strict validation)
-        allowed_keys = set(properties.keys())
-        actual_keys = set(value.keys())
-        unknown_keys = actual_keys - allowed_keys
+        # Determine which keys are allowed
+        if additional_properties is not None and additional_properties is not False:
+            # additionalProperties is defined (and not False): validate all properties
+            for key, val in value.items():
+                if key in properties:
+                    _validate_value(val, properties[key], spec, path=f"{path}.{key}")
+                else:
+                    # Key not in properties, validate against additionalProperties
+                    _validate_value(val, additional_properties, spec, path=f"{path}.{key}")
+        else:
+            # additionalProperties is False or not defined: strict mode
+            # Only properties defined in 'properties' are allowed
+            allowed_keys = set(properties.keys())
+            actual_keys = set(value.keys())
+            unknown_keys = actual_keys - allowed_keys
 
-        assert not unknown_keys, (
-            f"{path}: fixture contains unknown properties: {sorted(unknown_keys)}. "
-            f"Allowed properties from schema: {sorted(allowed_keys)}"
-        )
+            assert not unknown_keys, (
+                f"{path}: fixture contains unknown properties: {sorted(unknown_keys)}. "
+                f"Allowed properties from schema: {sorted(allowed_keys)}"
+            )
 
-        # Validate each property
-        for key, val in value.items():
-            if key in properties:
+            # Validate each defined property
+            for key, val in value.items():
                 _validate_value(val, properties[key], spec, path=f"{path}.{key}")
 
     elif schema_type == "array":

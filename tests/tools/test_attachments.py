@@ -35,7 +35,10 @@ TRANSCRIBED_VTT_RESPONSE = """WEBVTT
 00:00:00.000 --> 00:00:02.500
 This is a transcription."""
 
-# Fixture for the upload's 200 response (string map)
+# Fixture for the upload's 200 response (string map). The spec declares
+# {"type": "object", "additionalProperties": {"type": "string"}}, so the schema
+# permits any string-valued key. The key names here ("fileId", "status") are
+# illustrative placeholders; the validator pins only the value type, not the names.
 UPLOAD_SUCCESS_RESPONSE = {"fileId": "abc123", "status": "uploaded"}
 
 # Binary content with NUL and invalid UTF-8 to pin fidelity
@@ -108,7 +111,7 @@ async def test_upload_submission_attachment_sends_file_content(
 ) -> None:
     """upload_submission_attachment() uploads the file content."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json={}))
 
     test_file = tmp_path / "upload.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)
@@ -122,8 +125,8 @@ async def test_upload_submission_attachment_sends_file_content(
 
     assert route.call_count == 1
     parsed = json.loads(result)
-    assert parsed["status"] == "success"
-    assert parsed["httpStatus"] == 204
+    # The mock returns an empty dict as the 200 body
+    assert parsed == {}
 
     # Verify request details
     request = route.calls.last.request
@@ -135,7 +138,7 @@ async def test_upload_derives_filename_and_filesize_from_the_file(
 ) -> None:
     """upload_submission_attachment() derives filename and fileSize from the file."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json={}))
 
     test_file = tmp_path / "my-recording.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)
@@ -159,7 +162,7 @@ async def test_upload_rejects_a_missing_file(tmp_path: Path, respx_mock: respx.M
     """upload_submission_attachment() raises ToolError for a missing file."""
     missing_file = tmp_path / "does-not-exist.mp3"
     route = respx_mock.put(f"{TEST_BASE_URL}/form/submission/1/attachment").mock(
-        return_value=httpx.Response(204)
+        return_value=httpx.Response(200, json={})
     )
 
     with pytest.raises(ToolError) as excinfo:
@@ -179,7 +182,7 @@ async def test_upload_sends_the_attachment_token_header(
 ) -> None:
     """upload_submission_attachment() sends the X-nettskjema-attachment-token header."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json={}))
 
     test_file = tmp_path / "upload.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)
@@ -201,7 +204,7 @@ async def test_upload_sends_the_hyphenated_query_key(
 ) -> None:
     """upload_submission_attachment() sends translate-to-english as hyphenated query key."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json={}))
 
     test_file = tmp_path / "upload.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)
@@ -326,7 +329,7 @@ async def test_upload_validates_model_before_sending(
 ) -> None:
     """upload_submission_attachment() validates model against TranscribeDTO."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json={}))
 
     test_file = tmp_path / "upload.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)
@@ -350,7 +353,7 @@ async def test_upload_validates_language_before_sending(
 ) -> None:
     """upload_submission_attachment() validates language against TranscribeDTO."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json={}))
 
     test_file = tmp_path / "upload.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)
@@ -374,7 +377,7 @@ async def test_upload_rejects_token_with_control_characters(
 ) -> None:
     """upload_submission_attachment() rejects tokens with CR, LF, or NUL."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json={}))
 
     test_file = tmp_path / "upload.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)
@@ -414,7 +417,7 @@ async def test_upload_query_parameters(
 ) -> None:
     """upload_submission_attachment() sends all transcription options as query params."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(return_value=httpx.Response(204))
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json={}))
 
     test_file = tmp_path / "upload.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)

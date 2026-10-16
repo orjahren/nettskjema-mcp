@@ -1,22 +1,23 @@
 """Attachment download, upload, and transcription tools.
 
 Attachment uploads read the entire file into memory as bytes before sending. The
-fileSize query parameter is derived from the file so httpx can set an accurate
-Content-Length header instead of falling back to chunked transfer encoding. A long
-audio recording awaiting transcription can be tens of megabytes; the whole file is
-held in RAM during the upload.
+spec marks fileSize as optional, but we send it anyway, derived from the file so
+it cannot drift out of sync with the bytes. Separately, passing the body as bytes
+rather than a stream lets httpx set an accurate Content-Length header instead of
+falling back to chunked transfer encoding. A long audio recording awaiting
+transcription can be tens of megabytes; the whole file is held in RAM during the
+upload.
 
 The attachment token authorizes writing to someone else's submission. It is a
 credential and must never appear in a log line, an exception message, or a
 returned dict — the same rule the access token and the client secret already have.
 """
 
-import re
 from pathlib import Path
 from typing import Literal
 
 from nettskjema_mcp.client import dump, get_client
-from nettskjema_mcp.errors import BadRequestError, NotFoundError
+from nettskjema_mcp.errors import NotFoundError
 from nettskjema_mcp.routes import Route, endpoint
 from nettskjema_mcp.server import tool
 from nettskjema_mcp.validation import validate_body
@@ -110,24 +111,18 @@ async def upload_submission_attachment(
         file_path: Path to the file to upload. May be relative or contain ~.
         attachment_token: The attachment token from the submission creation
             response. Authorizes writing to this submission.
-        model: Transcription model. Defaults to the API's own default (model_auto).
+        model: Transcription model. Optional; the spec declares no default.
         language: Language code for transcription (e.g., "en", "no", "auto").
+            Optional; the spec declares no default.
         diarize: Request speaker identification in the transcription.
         translate_to_english: Request translation to English after transcription.
 
     Returns:
-        On HTTP 200, a JSON object with string keys and string values (the spec
-        declares {"type": "object", "additionalProperties": {"type": "string"}}).
-        On HTTP 204, a success marker: {"status": "success", "httpStatus": 204}.
+        A JSON object with string keys and string values when the response carries
+        a body (the spec declares {"type": "object", "additionalProperties":
+        {"type": "string"}}). When the response body is empty, a success marker:
+        {"status": "success", "httpStatus": <the status received>}.
     """
-    # Reject tokens containing control characters (prevents header injection and
-    # keeps malformed tokens out of exception chains that may leak via tracebacks)
-    if re.search(r"[\x00-\x1f\x7f]", attachment_token):
-        raise BadRequestError(
-            "The attachment token contains control characters and cannot be used. "
-            "The token must be a clean string value without CR, LF, NUL, or other "
-            "control characters."
-        )
 
     # Expand and resolve the path, then check the file exists
     path = Path(file_path).expanduser().resolve()
@@ -186,7 +181,9 @@ async def upload_submission_attachment(
 @tool(annotations={"readOnlyHint": True})
 @endpoint(TRANSCRIBED_JSON, TRANSCRIBED_TXT, TRANSCRIBED_VTT)
 async def get_attachment_transcription(
-    answer_attachment_id: int, format: Literal["json", "txt", "vtt"] = "json"
+    answer_attachment_id: int,
+    format: Literal["json", "txt", "vtt"] = "json",
+    max_chars: int | None = None,
 ) -> str:
     """
     Get the transcription of an attachment in JSON, plain text, or WebVTT format.
@@ -195,15 +192,26 @@ async def get_attachment_transcription(
     return meaningful results. A file uploaded without transcription, or a file
     that is not audio or video, has no transcription to retrieve.
 
+    For txt and vtt formats, the result is capped at max_chars (default 1,000,000)
+    to bound context size. Check the truncated field to see if the full text was
+    cut. The caller may raise this limit arbitrarily by passing a larger value.
+
     Args:
         answer_attachment_id: The attachment's numeric ID.
         format: The format to retrieve: "json" (detailed with timestamps), "txt"
             (plain text), or "vtt" (WebVTT subtitle format).
+        max_chars: Maximum characters to return for txt and vtt formats. Defaults
+            to this MCP server's configured limit (1,000,000). When the cap is
+            reached, the text is cut at the last complete newline before the limit
+            and truncated is set to true. Ignored for json format.
 
     Returns:
-        The transcription in the requested format. For "json", a JSON object with
-        the transcription data. For "txt" and "vtt", the text in an envelope with
-        a size signal and truncation flag.
+        For "json": a JSON object with the transcription data (the decoded response
+        body, verbatim).
+        For "txt" and "vtt": a JSON object with text (the transcription, possibly
+        truncated at the last newline), truncated (boolean), reason (string or null,
+        "charCap" when the cap was hit), and totalChars (the full size before
+        truncation).
     """
     route_map = {
         "json": TRANSCRIBED_JSON,
@@ -223,6 +231,7 @@ async def get_attachment_transcription(
         result = await get_client().text(
             selected_route,
             path={"answerAttachmentId": answer_attachment_id},
+            max_chars=max_chars,
         )
         return dump(result)
 
@@ -252,8 +261,9 @@ async def retranscribe_attachment(
 
     Args:
         answer_attachment_id: The attachment's numeric ID.
-        model: Transcription model. Defaults to the API's own default (model_auto).
+        model: Transcription model. Optional; the spec declares no default.
         language: Language code for transcription (e.g., "en", "no", "auto").
+            Optional; the spec declares no default.
         diarize: Request speaker identification in the transcription.
         translate_to_english: Request translation to English after transcription.
 

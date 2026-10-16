@@ -245,12 +245,14 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
     click through the prompts that matter. Tools in LOCAL_TOOLS issue no
     request at all and are exempt from both directions.
 
-    Tools that write to the local filesystem are exempt from the gets-only side:
-    they read from the API but can overwrite an arbitrary local file the model
-    names, so they are not read-only in the MCP sense.
+    Tools that write to the local filesystem invert the gets-only side rather
+    than escaping it: they read from the API but can overwrite an arbitrary
+    local file the model names, so they are not read-only in the MCP sense and
+    the hint must be absent. Merely exempting them let the annotation come back
+    unnoticed — re-adding readOnlyHint to export_form_csv left the suite green.
     """
-    # Tools exempt from the gets-only → readOnlyHint rule because they write
-    # to local files and can overwrite user data.
+    # Tools that must NOT carry readOnlyHint despite issuing only GETs, because
+    # they write to local files and can overwrite user data.
     FILE_WRITERS = {
         "get_submission_pdf",  # writes PDF to output_path, overwrites existing files
         "export_form_excel",  # writes Excel to output_path, overwrites existing files
@@ -266,6 +268,15 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
         read_only = annotations is not None and annotations.readOnlyHint is True
         gets_only = all(route.method == "GET" for route in routes)
 
+        if registered.name in FILE_WRITERS:
+            assert not read_only, (
+                f"{registered.name} takes an output_path and overwrites whatever file "
+                "the model names, but is annotated readOnlyHint; clients auto-approve "
+                "read-only calls without asking, so drop the annotation. If it no "
+                "longer writes a caller-named file, take it out of FILE_WRITERS"
+            )
+            continue
+
         if read_only:
             assert gets_only, (
                 f"{registered.name} is annotated readOnlyHint but calls "
@@ -275,9 +286,6 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
                 "exempt it here deliberately rather than dropping the hint"
             )
         else:
-            if registered.name in FILE_WRITERS:
-                # Exempt: writes to local filesystem
-                continue
             assert not gets_only, (
                 f"{registered.name} only issues GETs but is not annotated readOnlyHint; "
                 'add annotations={"readOnlyHint": True}'

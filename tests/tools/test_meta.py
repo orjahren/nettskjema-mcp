@@ -262,6 +262,32 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
             )
 
 
+async def test_delete_tools_carry_destructive_hint() -> None:
+    """
+    Every tool with a DELETE route must carry destructiveHint.
+
+    Clients may warn or require extra confirmation for destructive operations,
+    so missing the hint on a DELETE tool trains users to ignore warnings. A
+    non-DELETE tool may also carry the hint (a later task annotates a PUT as
+    destructive), so this test is one-directional: DELETE requires the hint,
+    but the hint does not require DELETE.
+    """
+    for registered in await mcp.list_tools():
+        routes = REGISTRY.get(registered.name)
+        if registered.name in LOCAL_TOOLS or routes is None:
+            continue
+
+        annotations = registered.annotations
+        destructive = annotations is not None and annotations.destructiveHint is True
+        has_delete = any(route.method == "DELETE" for route in routes)
+
+        if has_delete:
+            assert destructive, (
+                f"{registered.name} issues DELETE but is not annotated destructiveHint; "
+                'add annotations={"destructiveHint": True}'
+            )
+
+
 def test_tool_must_be_called_with_parentheses() -> None:
     """A bare @tool is the likely first mistake, so it must say what to write."""
     with pytest.raises(TypeError) as caught:

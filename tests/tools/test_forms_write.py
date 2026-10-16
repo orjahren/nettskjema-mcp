@@ -67,7 +67,7 @@ async def test_create_form_merges_extra_settings_without_overriding_required(
         collects_personal_data=False,
         sensitive_personal_data_collected=False,
         extra_settings={
-            "description": "A custom description",
+            "canNotAnswerMessage": "Please answer all questions",
             "title": "Ignored Title",  # This should be overridden
         },
     )
@@ -78,7 +78,7 @@ async def test_create_form_merges_extra_settings_without_overriding_required(
 
     # Named parameters take precedence
     assert settings["title"] == "Named Title"
-    assert settings["description"] == "A custom description"
+    assert settings["canNotAnswerMessage"] == "Please answer all questions"
 
 
 async def test_create_form_includes_elements_when_provided(respx_mock: respx.MockRouter) -> None:
@@ -192,3 +192,39 @@ async def test_update_form_settings_passes_force_cleanup(respx_mock: respx.MockR
 
     assert route.call_count == 1
     assert str(route.calls.last.request.url) == url
+
+
+async def test_update_form_settings_rejects_an_unknown_key_locally(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """update_form_settings() rejects unknown settings keys before calling the API."""
+    url = f"{TEST_BASE_URL}/form/123/settings"
+    route = respx_mock.patch(url).mock(return_value=httpx.Response(204))
+
+    with pytest.raises(ToolError) as caught:
+        await update_form_settings(123, {"unknownField": "value"})
+
+    message = str(caught.value)
+    assert "unknownField" in message or "vendored" in message or "schema" in message
+    assert route.call_count == 0
+
+
+async def test_create_form_rejects_unknown_settings_locally(respx_mock: respx.MockRouter) -> None:
+    """create_form() rejects unknown settings in the assembled body before calling the API."""
+    url = f"{TEST_BASE_URL}/form"
+    route = respx_mock.post(url).mock(return_value=httpx.Response(200, json={"formId": 123}))
+
+    with pytest.raises(ToolError) as caught:
+        await create_form(
+            title="Test",
+            language_code="en",
+            form_type=FormType.DEFAULT,
+            respondent_group=RespondentGroup.FEIDE,
+            collects_personal_data=False,
+            sensitive_personal_data_collected=False,
+            extra_settings={"notARealField": "value"},
+        )
+
+    message = str(caught.value)
+    assert "notARealField" in message or "vendored" in message or "schema" in message
+    assert route.call_count == 0

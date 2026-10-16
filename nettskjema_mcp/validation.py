@@ -1,6 +1,7 @@
 """Payload validation against vendored OpenAPI schemas."""
 
 import copy
+import difflib
 import re
 from functools import lru_cache
 from typing import Any
@@ -124,9 +125,13 @@ def _get_schema_and_registry(
     them on every validation call. The returned schema dict is immutable (read-only)
     and must not be modified by callers.
 
-    When partial=True, a modified schema with the top-level 'required' field removed
-    is created and registered in a temporary document in the registry, so nested
-    $refs still resolve correctly.
+    A modified schema with additionalProperties: false at the top level is always
+    created to reject unknown keys. This catches typos and flags fields that are
+    newer than the vendored spec snapshot. Top level only: nested $ref'd schemas
+    are not modified, where the constraint is far likelier to be wrong.
+
+    When partial=True, the top-level required constraint is also removed so that
+    PATCH endpoints can accept bodies with only a subset of fields.
 
     Args:
         schema_name: The schema name in components/schemas.
@@ -148,45 +153,39 @@ def _get_schema_and_registry(
             f"Available schemas: {', '.join(sorted(schemas.keys()))}"
         )
 
-    base_uri = "https://nettskjema.no/openapi.json"
+    # Always create a modified schema with additionalProperties: false
+    # to reject unknown keys at the top level
+    modified_schema = copy.deepcopy(schemas[schema_name])
+    modified_schema["additionalProperties"] = False
 
     if partial:
-        # For partial validation, create a modified schema without 'required'.
-        # Wrap it in a temporary OpenAPI-like document and register it so
-        # nested $refs resolve correctly.
-        partial_schema = copy.deepcopy(schemas[schema_name])
-        if "required" in partial_schema:
-            del partial_schema["required"]
+        # For partial validation, also remove the required constraint
+        if "required" in modified_schema:
+            del modified_schema["required"]
 
-        # Create a temporary document with the partial schema
-        temp_doc = {
-            "components": {"schemas": {f"{schema_name}_Partial": partial_schema}},
-            # Include all other schemas so nested $refs resolve
-            **spec,
-        }
-        temp_doc["components"]["schemas"] = {
-            **spec.get("components", {}).get("schemas", {}),
-            f"{schema_name}_Partial": partial_schema,
-        }
+    # Create a temporary document with the modified schema
+    suffix = "_Partial" if partial else "_Strict"
+    temp_doc = {
+        "components": {"schemas": {f"{schema_name}{suffix}": modified_schema}},
+        # Include all other schemas so nested $refs resolve
+        **spec,
+    }
+    temp_doc["components"]["schemas"] = {
+        **spec.get("components", {}).get("schemas", {}),
+        f"{schema_name}{suffix}": modified_schema,
+    }
 
-        # Register the temporary document
-        temp_uri = f"https://nettskjema.no/partial-{schema_name}.json"
-        temp_resource = Resource.from_contents(temp_doc, default_specification=DRAFT202012)
-        registry = registry.with_resource(uri=temp_uri, resource=temp_resource)
+    # Register the temporary document
+    temp_uri = f"https://nettskjema.no/{schema_name.lower()}{suffix.lower()}.json"
+    temp_resource = Resource.from_contents(temp_doc, default_specification=DRAFT202012)
+    registry = registry.with_resource(uri=temp_uri, resource=temp_resource)
 
-        # Reference the partial schema in the temporary document
-        ref = f"{temp_uri}#/components/schemas/{schema_name}_Partial"
-        if as_array:
-            schema = {"type": "array", "items": {"$ref": ref}}
-        else:
-            schema = {"$ref": ref}
+    # Reference the modified schema in the temporary document
+    ref = f"{temp_uri}#/components/schemas/{schema_name}{suffix}"
+    if as_array:
+        schema = {"type": "array", "items": {"$ref": ref}}
     else:
-        # Use a $ref to the schema in the base registry
-        ref = f"{base_uri}#/components/schemas/{schema_name}"
-        if as_array:
-            schema = {"type": "array", "items": {"$ref": ref}}
-        else:
-            schema = {"$ref": ref}
+        schema = {"$ref": ref}
 
     return schema, registry
 
@@ -200,6 +199,11 @@ def validate_body(
 ) -> None:
     """
     Validate a request body against a vendored OpenAPI schema.
+
+    Unknown keys are rejected locally to catch typos and flag fields that are
+    newer than the vendored spec snapshot. The error message names close matches
+    among the schema's real property names, turning a typo into an instant fix
+    and a stale snapshot into a legible complaint instead of a dead end.
 
     When partial=True, the top-level required constraint is removed so that
     PATCH endpoints can accept bodies with only a subset of fields. Nested
@@ -230,6 +234,11 @@ def validate_body(
     if not errors:
         return
 
+    # Get the base schema's properties for close-match suggestions
+    spec = load_spec()
+    base_schema = spec.get("components", {}).get("schemas", {}).get(schema_name, {})
+    properties = list(base_schema.get("properties", {}).keys())
+
     # Map each JSON pointer to its error messages, sorted naturally (numeric indices as ints)
     field_errors: dict[str, list[str]] = {}
     for error in sorted(errors, key=lambda e: _natural_sort_key(e.json_path)):
@@ -247,7 +256,21 @@ def validate_body(
             missing = error.validator_value
             message = f"missing required field(s): {', '.join(missing)}"
         elif error.validator == "additionalProperties":
-            message = f"unknown field: {error.message}"
+            # Extract the unknown field name from the error message
+            # The message is typically "Additional properties are not allowed ('fieldName' was unexpected)"
+            unknown_field = None
+            if "'" in error.message:
+                parts = error.message.split("'")
+                if len(parts) >= 2:
+                    unknown_field = parts[1]
+
+            message = f"not in the vendored {schema_name} schema snapshot"
+            if unknown_field and properties:
+                # Suggest close matches
+                matches = difflib.get_close_matches(unknown_field, properties, n=3, cutoff=0.6)
+                if matches:
+                    suggestions = ", ".join(repr(m) for m in matches)
+                    message += f"; did you mean {suggestions}?"
         else:
             message = error.message
 

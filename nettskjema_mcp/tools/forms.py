@@ -201,13 +201,16 @@ async def create_form(
             if key not in form_settings:
                 form_settings[key] = value
 
+    # Validate formSettings against CreateFormSettingsDTO to reject unknown keys
+    validate_body("CreateFormSettingsDTO", form_settings)
+
     # Assemble the FormSettingsAndElementsDTO shape
     body: dict[str, object] = {
         "formSettings": form_settings,
         "elements": elements or [],
     }
 
-    # Validate against the schema before sending
+    # Validate the complete body shape
     validate_body("FormSettingsAndElementsDTO", body)
 
     return dump(await get_client().json(CREATE_FORM, body=body))
@@ -247,6 +250,11 @@ async def update_form_settings(
     This endpoint accepts partial updates: only the settings included in the settings
     dict will be updated. A 207 Multi-Status response means some settings were applied
     and others were rejected; this is reported as an error listing the failed settings.
+
+    The settings dict is validated as a partial FormSettingsDTO before the request is
+    sent. Required-field constraints are relaxed for partial updates, but unknown keys
+    are rejected locally to catch typos and flag fields that are newer than the vendored
+    spec snapshot.
 
     Args:
         form_id: The form's numeric ID.

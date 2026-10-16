@@ -20,7 +20,9 @@ async def list_my_forms() -> str:
     List all forms owned by the authenticated API client.
 
     Returns:
-        An array of form metadata objects as JSON, each with formId, title, and status.
+        An array of form summary objects as JSON. Each object includes formId, title,
+        open (boolean), modifiedDate, lastSubmissionDate, numberOfDeliveredSubmissions,
+        deliveryDestination, and myFormsFormListingGroup.
     """
     return dump(await get_client().json(LIST_MY_FORMS))
 
@@ -35,7 +37,7 @@ async def lookup_form_by_title(title_short: str) -> str:
         title_short: The form's titleShort, as it appears in the form's public URL.
 
     Returns:
-        The form metadata as JSON, with formId, title, and other basic fields.
+        A mapping object as JSON. The schema defines it as an object with integer values.
     """
     return dump(await get_client().json(LOOKUP_BY_TITLE, path={"titleShort": title_short}))
 
@@ -44,13 +46,15 @@ async def lookup_form_by_title(title_short: str) -> str:
 @endpoint(FORM_INFO)
 async def get_form_info(form_id: int) -> str:
     """
-    Get basic information about a form: owner, creation date, and access settings.
+    Get operational metadata about a form: submission counts, open/closed status, and edit permissions.
 
     Args:
         form_id: The form's numeric ID.
 
     Returns:
-        The form info as JSON, including owner, created timestamp, and visibility flags.
+        Form metadata as JSON, including title, isOpen, canEditForm, numberOfSubmissions,
+        numberOfInvitations, hasSubmissions, modifiedBy, modifiedDate, lastSubmissionDate,
+        deleteDate, and deliveryDestination. Does not include creation date or owner.
     """
     return dump(await get_client().json(FORM_INFO, path={"formId": form_id}))
 
@@ -59,14 +63,17 @@ async def get_form_info(form_id: int) -> str:
 @endpoint(FORM_SETTINGS)
 async def get_form_settings(form_id: int, is_for_create_form: bool = False) -> str:
     """
-    Get the form's settings: title, description, notifications, and data retention policy.
+    Get the form's configuration: all 51 settings controlling form behavior and permissions.
 
     Args:
         form_id: The form's numeric ID.
         is_for_create_form: Whether to return settings suitable for creating a new form.
 
     Returns:
-        The form settings as JSON, including title, description, and configuration options.
+        The form settings as JSON, including title, editors, editorsSubmissionEmailType,
+        emailInvitationText, emailReminderText, deleteSubmissionsAfterNumberOfDays,
+        personalDataPurposeDescription, openFrom, openTo, maxSubmissionsForm, languageCode,
+        and 40 other configuration fields. Does not include a plain description field.
     """
     return dump(
         await get_client().json(
@@ -81,13 +88,14 @@ async def get_form_settings(form_id: int, is_for_create_form: bool = False) -> s
 @endpoint(FORM_SETTINGS_VALIDATION)
 async def get_form_settings_validation(form_id: int) -> str:
     """
-    Get the validation rules configured for the form's settings.
+    Get validation errors or constraints for the form's settings.
 
     Args:
         form_id: The form's numeric ID.
 
     Returns:
-        The validation constraints as JSON, describing which settings are required or restricted.
+        An error message object as JSON, with message (string), errors (object), and
+        confirmForceCleanupErrors fields, describing validation issues or constraints.
     """
     return dump(await get_client().json(FORM_SETTINGS_VALIDATION, path={"formId": form_id}))
 
@@ -96,13 +104,16 @@ async def get_form_settings_validation(form_id: int) -> str:
 @endpoint(FORM_DEFINITION)
 async def get_form_definition(form_id: int) -> str:
     """
-    Get the form's complete structure: all elements, their types, options, and ordering.
+    Get the form's structure and creation history: the elements array and authorship metadata.
 
     Args:
         form_id: The form's numeric ID.
 
     Returns:
-        The form definition as JSON, with a elements array describing the form's structure.
+        The form definition as JSON, including elements (array of form elements with their
+        types and configuration), createdBy, createdDate, modifiedBy, modifiedDate, editors,
+        title, formType, version, languageCode, and personal data settings. Includes creation
+        date and author, unlike get_form_info.
     """
     return dump(await get_client().json(FORM_DEFINITION, path={"formId": form_id}))
 
@@ -122,7 +133,9 @@ async def list_forms_collecting_personal_data(
             inactive (True), or exclude those (False), or None for all.
 
     Returns:
-        An array of form records as JSON, each flagging its personal data collection status.
+        An array of form records as JSON. Each object includes formId, deliveryDestination,
+        editors, numberOfDeliveredSubmissions, openFrom, openTo, personalDataPurposeDescription,
+        personalDataSharedOutsideWith, purposes, and lastSubmissionDate.
     """
     return dump(
         await get_client().json(

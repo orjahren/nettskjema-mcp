@@ -189,11 +189,3 @@ async def test_list_forms_collecting_personal_data_with_both_filters(
     assert route.call_count == 1
     assert json.loads(result) == PERSONAL_DATA_FORMS
     assert str(route.calls.last.request.url) == url
-
-
-async def test_optional_query_params_are_omitted_when_none() -> None:
-    """None-valued optional query parameters produce no query string at all."""
-    # get_form_settings is tested above with no query param
-    # list_forms_collecting_personal_data is tested above with no query params
-    # Both cases already covered, this test documents the contract explicitly
-    assert True

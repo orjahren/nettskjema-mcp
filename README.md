@@ -1,35 +1,30 @@
 # Nettskjema MCP Server
 
-Model Context Protocol (MCP) server for the Nettskjema API. This server provides tools to interact with Nettskjema forms, submissions, invitations, and more through the MCP protocol.
+Model Context Protocol (MCP) server for the Nettskjema API v3. Provides tools to interact with Nettskjema forms, submissions, and data export through the MCP protocol.
 
 ## Features
 
-- **OAuth 2.1 Authentication**: Secure client credentials flow with 24-hour token caching
-- **Form Management**: Create, list, retrieve, and update forms
-- **Form Elements**: Add, update, delete, and reorder form questions/elements
-- **AI-Assisted Form Building**: Perfect for Next.js integration with LLMs
-- **Submissions**: Access and manage form submissions
-- **Invitations**: Create and manage form invitations
+- **OAuth 2.1 Authentication**: Secure client credentials flow with automatic token caching and refresh
+- **Form Management**: Create, list, retrieve, update, and delete forms
+- **Form Elements**: Get, update, and replace form elements (questions)
+- **Submissions**: Submit, retrieve, and manage form responses
 - **Data Export**: Export form responses as CSV, Excel, and SPSS
+- **Attachments**: Upload and retrieve submission attachments with transcription support
+- **Invitations**: Send reminders to pending invitations (creation handled in frontend)
 - **User Information**: Get authenticated user details
-- **Automatic Token Management**: Tokens are cached and automatically refreshed
+- **Type-Safe**: Full type hints and validated against the OpenAPI spec
 
 ## Installation
 
-1. Clone this repository:
+Clone this repository and install with pip or uv:
 
 ```bash
 git clone <repository-url>
 cd nettskjema-mcp
-```
-
-2. Install dependencies using pip:
-
-```bash
 pip install -e .
 ```
 
-Or using uv:
+Or with uv:
 
 ```bash
 uv pip install -e .
@@ -42,33 +37,33 @@ uv pip install -e .
 1. Log into https://authorization.nettskjema.no/
 2. Click **"Register client"**
 3. Provide a client name and email
-4. **Save the clientSecret immediately** - it's shown only once!
+4. **Save the clientSecret immediately** - it's shown only once
 5. Note your `clientId` and `clientSecret`
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file from the example:
+Create a `.env` file:
 
 ```bash
 cp .env.example .env
 ```
 
-Add your credentials to the `.env` file:
+Add your credentials:
 
 ```env
 NETTSKJEMA_CLIENT_ID=your_client_id_here
 NETTSKJEMA_CLIENT_SECRET=your_client_secret_here
 ```
 
-**Security Note:** Never commit or hardcode your `clientSecret` in code. It's like a password and valid for 365 days. Store it in environment variables or a secure vault.
+**Security**: Never commit your `clientSecret`. Store it in environment variables or a secure vault.
 
-**Token Management:** OAuth access tokens are valid for 24 hours and are automatically cached and reused by the server. You don't need to manage token refresh manually.
+**Token Management**: OAuth access tokens are valid for 24 hours and are automatically cached and refreshed.
 
 ### 3. Grant Form Access
 
 Your API client username is: `<clientId>@apiclient`
 
-For each form you want to access, add this username to the form permissions:
+For each form you want to access:
 - Open the form in Nettskjema
 - Go to: **Settings → Permissions → Editing permissions**
 - Add your client username
@@ -77,19 +72,13 @@ For each form you want to access, add this username to the form permissions:
 
 ### Running the Server
 
-After installation, you can run the server using the installed command:
+After installation:
 
 ```bash
 nettskjema-mcp
 ```
 
-Or run as a Python module:
-
-```bash
-python -m nettskjema_mcp
-```
-
-For development (without installation):
+Or as a Python module:
 
 ```bash
 python -m nettskjema_mcp
@@ -97,9 +86,8 @@ python -m nettskjema_mcp
 
 ### MCP Client Configuration
 
-Add this to your MCP client configuration (e.g., Claude Desktop config):
+Add to your MCP client configuration (e.g., Claude Desktop):
 
-**Option 1: Using installed command (recommended)**
 ```json
 {
   "mcpServers": {
@@ -114,125 +102,111 @@ Add this to your MCP client configuration (e.g., Claude Desktop config):
 }
 ```
 
-**Option 2: Using Python module (for development)**
-```json
-{
-  "mcpServers": {
-    "nettskjema": {
-      "command": "python",
-      "args": ["-m", "nettskjema_mcp"],
-      "cwd": "/path/to/nettskjema-mcp",
-      "env": {
-        "NETTSKJEMA_CLIENT_ID": "your_client_id_here",
-        "NETTSKJEMA_CLIENT_SECRET": "your_client_secret_here"
-      }
-    }
-  }
-}
-```
-
 ## Available Tools
 
 ### Authentication & User
 
-- `check_auth_status` - Check OAuth authentication status and token info (debugging)
-- `get_user_info` - Get authenticated user information
+| Tool | Description |
+|------|-------------|
+| `check_auth_status` | Check OAuth authentication status and token info |
+| `get_user_info` | Get authenticated user information |
 
 ### Forms
 
-- `list_my_forms` - List all your forms
-- `create_form` - Create a new form
-- `delete_forms` - Delete forms with trash retention
-- `get_form_info` - Get metadata for a specific form
-- `get_form_settings` - Get form configuration
-- `get_form_elements` - Get all questions/elements in a form
-- `get_form_definition` - Get complete form definition
-- `update_form_settings` - Update form settings
-- `lookup_form_by_title` - Find form ID by short title
+| Tool | Description |
+|------|-------------|
+| `list_my_forms` | List all your forms |
+| `create_form` | Create a new form (requires title and language) |
+| `delete_forms` | Delete forms by ID (with trash retention) |
+| `get_form_info` | Get metadata for a form |
+| `get_form_definition` | Get complete form definition |
+| `get_form_settings` | Get form configuration |
+| `get_form_settings_validation` | Validate form settings without saving |
+| `update_form_settings` | Update form configuration |
+| `lookup_form_by_title` | Find form ID by short title |
+| `activate_educloud` | Activate EduCloud integration |
+| `activate_tsd` | Activate TSD (Tjenester for Sensitive Data) |
+| `list_forms_collecting_personal_data` | List forms that collect personal data |
 
-### Form Elements (Questions)
+### Form Elements
 
-- `add_form_element` - Add a new question/element to a form
-- `update_form_element` - Update an existing form element
-- `delete_form_element` - Delete a form element
-- `reorder_form_elements` - Reorder elements in a form
-- `duplicate_form_element` - Duplicate an existing element
+| Tool | Description |
+|------|-------------|
+| `get_form_elements` | Get all elements in a form |
+| `update_form_element` | Update a single element by ID |
+| `replace_form_elements` | Replace entire element list (keep-list semantics) |
+
+**Note**: Element tools use read-modify-write. See [docs/workflows.md](docs/workflows.md) for details.
 
 ### Submissions
 
-- `submit_form` - Submit a response to a form
-- `get_submission` - Get a single submission with answers
-- `get_submission_metadata` - Get metadata for all submissions
-- `list_my_submissions` - List your submissions
-- `get_form_answers` - Get all answers for a form
-- `delete_submissions` - Delete specific submissions
+| Tool | Description |
+|------|-------------|
+| `submit_form` | Submit a response to a form |
+| `submit_form_for_invitation` | Submit response using an invitation ID |
+| `get_submission` | Get a submission with answers |
+| `get_submission_metadata` | Get metadata for all submissions |
+| `get_postponed_submission_metadata` | Get metadata for postponed submissions |
+| `get_submission_pdf` | Get PDF rendering of a submission |
+| `list_my_submissions` | List your submissions |
+| `delete_submissions` | Delete specific submissions by ID |
+| `delete_all_submissions` | Delete all submissions from a form |
+
+### Answers & Attachments
+
+| Tool | Description |
+|------|-------------|
+| `get_form_answers` | Get all answers for a form |
+| `get_answer_attachment` | Download an attachment by ID |
+| `upload_submission_attachment` | Upload file attachment to a submission |
+| `get_attachment_transcription` | Get transcription of audio/video attachment |
+| `retranscribe_attachment` | Request new transcription of attachment |
 
 ### Data Export
 
-- `export_form_csv` - Export responses as CSV
-- `export_form_excel` - Export responses as Excel
-- `get_spss_syntax` - Generate SPSS syntax file
+| Tool | Description |
+|------|-------------|
+| `export_form_csv` | Export responses as CSV (semicolon delimiter) |
+| `export_form_excel` | Export responses as Excel file |
+| `get_spss_syntax` | Generate SPSS syntax file |
+
+### Codebooks & Images
+
+| Tool | Description |
+|------|-------------|
+| `upload_codebook` | Upload a codebook for a form |
+| `upload_image` | Upload an image to Vortex |
+| `get_image` | Retrieve an image by ID |
 
 ### Invitations
 
-- `get_invitations` - List all form invitations
-- `create_invitation` - Create new invitation with optional SMS
-- `delete_invitations` - Delete specific invitations
-- `send_reminder` - Send reminder notifications
+| Tool | Description |
+|------|-------------|
+| `remind_all_pending_invitations` | Send reminders to all pending invitations |
 
-## Quick Start
+**Invitation Creation Not Supported**: The v2 invitation API is private and not available through this MCP server. To create invitations, use the frontend at `https://nettskjema.no/user/form/{formId}/collect-responses/invited/create`. Configure the form for invitations via MCP using `update_form_settings` with `respondentGroup: "INVITED"`, then create invitations in the web UI. See [docs/workflows.md](docs/workflows.md#invitations) for the complete workflow.
 
-After installation and configuration, you can use the MCP server with any MCP-compatible client. Here are some example use cases:
+## Documentation
 
-### List Your Forms
+- [API Coverage](docs/api-coverage.md) - Complete mapping of API routes to tools
+- [Workflows](docs/workflows.md) - Common patterns and workflows
+- [Contributing](CONTRIBUTING.md) - Development guidelines
 
-```
-Use the list_my_forms tool to see all forms you have access to.
-```
+## Testing
 
-### Get Form Details
+Run the test suite:
 
-```
-Use get_form_info with a form_id to see the form's metadata.
-Use get_form_elements to see all questions in the form.
-```
-
-### Export Data
-
-```
-Use export_form_csv or export_form_excel to download form responses.
-Use get_form_answers to get raw answer data.
-```
-
-### Manage Invitations
-
-```
-Use create_invitation to invite someone to fill out a form.
-Use send_reminder to remind people who haven't responded yet.
-```
-
-## Next.js Integration
-
-This MCP server is designed to work seamlessly with Next.js for AI-assisted form building. See the [Next.js Integration Guide](NEXTJS_INTEGRATION.md) for detailed instructions.
-
-### Quick Start for Next.js
-
-1. Install the MCP SDK in your Next.js project:
 ```bash
-npm install @modelcontextprotocol/sdk openai
+pytest
 ```
 
-2. Check out the [nextjs-example](nextjs-example/) directory for complete working examples:
-   - API route implementation
-   - React component
-   - TypeScript type definitions
+Run with coverage:
 
-3. Use case: Let your editors describe forms in natural language, and AI will build them automatically using the MCP tools.
+```bash
+pytest --cov=nettskjema_mcp --cov-report=html
+```
 
-Example user prompts:
-- "Create a customer feedback form with name, email, rating (1-5), and comments"
-- "Create an event registration form with dietary restrictions"
-- "Add a question about age to form 12345"
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and testing guidelines.
 
 ## API Documentation
 

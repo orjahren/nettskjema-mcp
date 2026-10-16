@@ -3,10 +3,10 @@ name = "nettskjema-mcp"
 version = "0.1.0"
 description = "Model Context Protocol server for Nettskjema API"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-    { name = "Oliver Ruste Jahren", email = "oliverrj@uio.no" }
+    { name = "Oliver Ruste Jahren", email = "oliverrj@uio.no" },
     { name = "Claude Sonnet 4.5", email = "noreply@anthropic.com" }
 ]
 keywords = ["mcp", "nettskjema", "uio", "forms", "api", "model-context-protocol"]
@@ -15,15 +15,16 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
 dependencies = [
-    "fastmcp>=0.5.0",
+    "fastmcp>=3.0,<4",
     "httpx>=0.28.1",
+    "python-dotenv>=1.0",
+    "jsonschema>=4.21",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +32,8 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "ruff>=0.3.0",
+    "respx>=0.21",
+    "mypy>=1.9",
 ]
 
 [project.urls]
@@ -46,12 +49,15 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["nettskjema_mcp"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"nettskjema_mcp/spec/openapi.json" = "nettskjema_mcp/spec/openapi.json"
+
 [project.scripts]
 nettskjema-mcp = "nettskjema_mcp:main"
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [
@@ -73,9 +79,13 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "-m 'not e2e'"
+markers = [
+    "e2e: end-to-end integration tests",
+]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

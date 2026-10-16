@@ -65,38 +65,61 @@ pytest tests/test_auth.py
 
 ### Adding a New MCP Tool
 
-1. **Add the tool function** in `nettskjema_mcp/__init__.py`:
+1. **Determine the module**: Tools are organized by category in `nettskjema_mcp/tools/`:
+   - `forms_read.py` - Read-only form operations
+   - `forms_write.py` - Form creation and modification
+   - `elements.py` - Form element operations
+   - `submissions_read.py` - Read submission data
+   - `submissions_write.py` - Submit and delete
+   - `exports.py` - CSV, Excel, SPSS
+   - `answers.py` - Answer and attachment access
+   - `attachments.py` - Attachment upload and transcription
+   - `admin.py` - Delete forms, reminders
+   - `auth.py` - Authentication status
+
+2. **Add the tool function** in the appropriate module:
    ```python
-   @mcp.tool()
-   async def my_new_tool(param: str) -> str:
+   from nettskjema_mcp.routes import Route, endpoint
+   from nettskjema_mcp.server import tool
+
+
+   @tool
+   @endpoint(Route("GET", "/form/{formId}/example"))
+   async def my_new_tool(form_id: int) -> str:
        """
-       Tool description here.
+       Brief description of what this tool does.
 
        Args:
-           param: Parameter description
+           form_id: Description of the parameter
+
+       Returns:
+           Description of what the tool returns
        """
-       result = await api_request("GET", f"/endpoint/{param}")
-       return format_response(result)
+       client = get_client()
+       response = await client.get(f"/form/{form_id}/example")
+       data = response.json()
+       return f"Result: {data}"
    ```
 
-2. **Export it** in `__all__`:
-   ```python
-   __all__ = [
-       # ... existing tools ...
-       "my_new_tool",
-   ]
-   ```
+3. **Register the route** using the `@endpoint` decorator with the OpenAPI path
 
-3. **Document it** in `README.md` under "Available Tools"
+4. **Add tests** in `tests/tools/test_<module>.py` with mocked responses
 
-4. **Add tests** in `tests/test_*.py`
+5. **Validate fixtures** against the OpenAPI spec using `validate_response_fixture`
+
+6. **Run the test suite** to ensure everything passes
+
+7. **Update documentation**:
+   - `docs/api-coverage.md` (regenerate programmatically if needed)
+   - `docs/workflows.md` if the tool introduces a new workflow
+   - `README.md` if it's a major feature
 
 ### Updating Documentation
 
 - Update `README.md` for user-facing changes
-- Update `TESTING.md` for testing procedures
 - Update `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/)
 - Update `CLAUDE.md` for development guidelines
+- Update `docs/api-coverage.md` and `docs/workflows.md` if adding new tools or workflows
 
 ## Pull Request Process
 

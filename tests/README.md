@@ -35,6 +35,7 @@ Example:
 ```python
 import pytest
 
+
 @pytest.mark.asyncio
 async def test_my_feature():
     """Test that my feature works correctly."""

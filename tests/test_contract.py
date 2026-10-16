@@ -14,7 +14,7 @@ from nettskjema_mcp.enums import (
     RespondentGroup,
     ScoreResultDisplayType,
 )
-from nettskjema_mcp.routes import REGISTRY, OUT_OF_SCOPE, Route, endpoint, load_spec
+from nettskjema_mcp.routes import OUT_OF_SCOPE, REGISTRY, Route, endpoint, load_spec
 
 
 def _spec_enum(spec: dict[str, object], schema: str, prop: str) -> list[str]:
@@ -69,18 +69,19 @@ def test_spec_snapshot_is_the_production_surface() -> None:
     """Verify the vendored spec has the expected number of paths and operations."""
     spec = load_spec()
     assert len(spec["paths"]) == 36  # type: ignore[arg-type]
-    assert sum(
-        1
-        for p in spec["paths"].values()  # type: ignore[union-attr]
-        for m in p  # type: ignore[union-attr]
-        if m in {"get", "post", "put", "patch", "delete"}
-    ) == 42
+    assert (
+        sum(
+            1
+            for p in spec["paths"].values()  # type: ignore[union-attr]
+            for m in p  # type: ignore[union-attr]
+            if m in {"get", "post", "put", "patch", "delete"}
+        )
+        == 42
+    )
 
 
 @pytest.mark.parametrize("enum_cls,schema,prop", ENUM_LOCATIONS)
-def test_enum_members_match_the_spec(
-    enum_cls: type, schema: str, prop: str
-) -> None:
+def test_enum_members_match_the_spec(enum_cls: type, schema: str, prop: str) -> None:
     """Verify enum members match the spec definition."""
     declared = _spec_enum(load_spec(), schema, prop)
     assert [e.value for e in enum_cls] == declared  # type: ignore[attr-defined]

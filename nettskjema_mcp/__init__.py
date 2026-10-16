@@ -3,10 +3,11 @@ Nettskjema MCP Server
 A Model Context Protocol server for interacting with the Nettskjema API.
 """
 
-import os
 import json
-from typing import Optional, Any
+import os
 from datetime import datetime, timedelta
+from typing import Any, Optional
+
 import httpx
 from fastmcp import FastMCP
 
@@ -54,12 +55,12 @@ BASE_URL = "http://localhost:8008/api/v3"  # Use local server for testing
 # AUTH_URL = "https://authorization.nettskjema.no/oauth2/token"
 AUTH_URL = "https://nettskjema-authorization-dev.uio.no/oauth2/token"
 
-print(f"[NETTSKJEMA MCP] Configured with:")
+print("[NETTSKJEMA MCP] Configured with:")
 print(f"  API Base URL: {BASE_URL}")
 print(f"  Auth URL: {AUTH_URL}")
 
 # Token cache
-_token_cache: Optional[dict[str, Any]] = None
+_token_cache: dict[str, Any] | None = None
 
 
 async def get_oauth_token() -> str:
@@ -99,7 +100,7 @@ async def get_oauth_token() -> str:
             print(f"[DEBUG] Auth response status: {response.status_code}")
             response.raise_for_status()
             token_data = response.json()
-            print(f"[DEBUG] Token received successfully")
+            print("[DEBUG] Token received successfully")
         except Exception as e:
             print(f"[DEBUG] OAuth token request failed: {e}")
             raise
@@ -126,8 +127,8 @@ async def get_auth_headers() -> dict[str, str]:
 async def api_request(
     method: str,
     endpoint: str,
-    params: Optional[dict[str, Any]] = None,
-    json_data: Optional[dict[str, Any]] = None,
+    params: dict[str, Any] | None = None,
+    json_data: dict[str, Any] | None = None,
 ) -> Any:
     """Make an authenticated request to the Nettskjema API."""
     headers = await get_auth_headers()
@@ -281,7 +282,7 @@ async def list_my_submissions() -> str:
 
 
 @mcp.tool()
-async def get_form_answers(form_id: int, element_id: Optional[int] = None) -> str:
+async def get_form_answers(form_id: int, element_id: int | None = None) -> str:
     """
     Get all answers for a form, optionally filtered by element.
 
@@ -323,7 +324,7 @@ async def create_invitation(
     form_id: int,
     email: str,
     send_sms: bool = False,
-    phone_number: Optional[str] = None,
+    phone_number: str | None = None,
 ) -> str:
     """
     Create a new invitation for a form.
@@ -344,11 +345,7 @@ async def create_invitation(
         invitation_data["sendSms"] = True
         invitation_data["phoneNumber"] = phone_number
 
-    result = await api_request(
-        "POST",
-        f"/form/{form_id}/invitations",
-        json_data=[invitation_data]
-    )
+    result = await api_request("POST", f"/form/{form_id}/invitations", json_data=[invitation_data])
     return format_response(result)
 
 
@@ -362,9 +359,7 @@ async def delete_submissions(form_id: int, submission_ids: list[int]) -> str:
         submission_ids: List of submission IDs to delete
     """
     result = await api_request(
-        "DELETE",
-        f"/form/{form_id}/submission",
-        json_data={"submissionIds": submission_ids}
+        "DELETE", f"/form/{form_id}/submission", json_data={"submissionIds": submission_ids}
     )
     return format_response(result)
 
@@ -390,11 +385,7 @@ async def update_form_settings(form_id: int, settings: dict[str, Any]) -> str:
         form_id: The ID of the form
         settings: Dictionary of settings to update (e.g., {"title": "New Title"})
     """
-    result = await api_request(
-        "PATCH",
-        f"/form/{form_id}/settings",
-        json_data=settings
-    )
+    result = await api_request("PATCH", f"/form/{form_id}/settings", json_data=settings)
     return format_response(result)
 
 
@@ -408,9 +399,7 @@ async def send_reminder(form_id: int, invitation_ids: list[int]) -> str:
         invitation_ids: List of invitation IDs to send reminders to
     """
     result = await api_request(
-        "POST",
-        f"/form/{form_id}/remind",
-        json_data={"invitationIds": invitation_ids}
+        "POST", f"/form/{form_id}/remind", json_data={"invitationIds": invitation_ids}
     )
     return format_response(result)
 
@@ -471,9 +460,7 @@ async def submit_form(form_id: int, answers: dict[str, Any]) -> str:
         answers: Dictionary of answers where keys are element IDs
     """
     result = await api_request(
-        "POST",
-        f"/form/{form_id}/submission",
-        json_data={"answers": answers}
+        "POST", f"/form/{form_id}/submission", json_data={"answers": answers}
     )
     return format_response(result)
 
@@ -488,9 +475,7 @@ async def delete_invitations(form_id: int, invitation_ids: list[int]) -> str:
         invitation_ids: List of invitation IDs to delete
     """
     result = await api_request(
-        "DELETE",
-        f"/form/{form_id}/invitations",
-        json_data={"invitationIds": invitation_ids}
+        "DELETE", f"/form/{form_id}/invitations", json_data={"invitationIds": invitation_ids}
     )
     return format_response(result)
 
@@ -524,10 +509,10 @@ async def add_form_element(
     form_id: int,
     element_type: str,
     question_text: str,
-    description: Optional[str] = None,
+    description: str | None = None,
     required: bool = False,
-    options: Optional[list[str]] = None,
-    position: Optional[int] = None,
+    options: list[str] | None = None,
+    position: int | None = None,
 ) -> str:
     """
     Add a new element (question) to a form.
@@ -565,11 +550,7 @@ async def add_form_element(
     if position is not None:
         element_data["position"] = position
 
-    result = await api_request(
-        "POST",
-        f"/form/{form_id}/elements",
-        json_data=element_data
-    )
+    result = await api_request("POST", f"/form/{form_id}/elements", json_data=element_data)
     return format_response(result)
 
 
@@ -577,10 +558,10 @@ async def add_form_element(
 async def update_form_element(
     form_id: int,
     element_id: int,
-    question_text: Optional[str] = None,
-    description: Optional[str] = None,
-    required: Optional[bool] = None,
-    options: Optional[list[str]] = None,
+    question_text: str | None = None,
+    description: str | None = None,
+    required: bool | None = None,
+    options: list[str] | None = None,
 ) -> str:
     """
     Update an existing form element.
@@ -604,11 +585,7 @@ async def update_form_element(
     if options is not None:
         updates["options"] = options
 
-    result = await api_request(
-        "PATCH",
-        f"/form/{form_id}/elements/{element_id}",
-        json_data=updates
-    )
+    result = await api_request("PATCH", f"/form/{form_id}/elements/{element_id}", json_data=updates)
     return format_response(result)
 
 
@@ -621,10 +598,7 @@ async def delete_form_element(form_id: int, element_id: int) -> str:
         form_id: The ID of the form
         element_id: The ID of the element to delete
     """
-    result = await api_request(
-        "DELETE",
-        f"/form/{form_id}/elements/{element_id}"
-    )
+    result = await api_request("DELETE", f"/form/{form_id}/elements/{element_id}")
     return format_response(result)
 
 
@@ -638,9 +612,7 @@ async def reorder_form_elements(form_id: int, element_order: list[int]) -> str:
         element_order: List of element IDs in the desired order
     """
     result = await api_request(
-        "PUT",
-        f"/form/{form_id}/elements/order",
-        json_data={"elementOrder": element_order}
+        "PUT", f"/form/{form_id}/elements/order", json_data={"elementOrder": element_order}
     )
     return format_response(result)
 
@@ -654,10 +626,7 @@ async def duplicate_form_element(form_id: int, element_id: int) -> str:
         form_id: The ID of the form
         element_id: The ID of the element to duplicate
     """
-    result = await api_request(
-        "POST",
-        f"/form/{form_id}/elements/{element_id}/duplicate"
-    )
+    result = await api_request("POST", f"/form/{form_id}/elements/{element_id}/duplicate")
     return format_response(result)
 
 

@@ -98,7 +98,9 @@ async def test_second_call_uses_the_cache(settings: Settings) -> None:
         assert route.call_count == 1
 
 
-async def test_expired_token_is_refetched(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_expired_token_is_refetched(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that an expired token triggers a refetch."""
     # Start at time 0
     fake_time = 0.0
@@ -301,6 +303,7 @@ async def test_concurrent_callers_fetch_once(
     settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test that concurrent token() calls result in a single fetch."""
+
     # Make the response slow enough that the race is real
     async def slow_response(request: httpx.Request) -> httpx.Response:
         await asyncio.sleep(0.1)

@@ -1,9 +1,10 @@
 """Route registry and OpenAPI spec loader for Nettskjema MCP tools."""
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 try:
     from importlib.resources import files

@@ -1,6 +1,7 @@
 """Tests for configuration module."""
 
 import pytest
+
 from nettskjema_mcp.config import get_settings, reset_settings
 
 

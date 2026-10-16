@@ -9,7 +9,7 @@ it empties a form.
 """
 
 from nettskjema_mcp.client import dump, get_client
-from nettskjema_mcp.errors import NotFoundError, UpstreamError
+from nettskjema_mcp.errors import BadRequestError, NotFoundError, UpstreamError
 from nettskjema_mcp.routes import Route, endpoint
 from nettskjema_mcp.server import tool
 from nettskjema_mcp.validation import validate_body
@@ -78,9 +78,10 @@ async def get_form_elements(form_id: int) -> str:
         repeatedNationalIdRequired, routingReferenceIds,
         sendAdditionalRecipientEmail and useForRedirectToForm.
     """
-    # The spec declares no query parameter on this operation, and none is sent:
-    # the path is served by two handlers and "?answer" would select the
-    # respondent-facing view instead of the one this tool documents.
+    # The spec declares no query parameter on this operation, so none is sent.
+    # NettskjemaClient.json would happily add one, and a parameter nobody asked
+    # for could select a different view of the same path, so the test asserts
+    # the query string stays empty.
     return dump(await get_client().json(LIST_ELEMENTS, path={"formId": form_id}))
 
 
@@ -103,8 +104,11 @@ async def replace_form_elements(form_id: int, elements: list[dict[str, object]])
     endpoint offers no version field, ETag or conditional header to detect that.
 
     Each element is checked against the vendored ElementDTO schema before the
-    request is sent. elementType is required on every element; unknown field
-    names are rejected locally, with close matches suggested.
+    request is sent: elementType is required on every element and must be one of
+    the known types, and every field the schema declares is checked for type and
+    range. A field the schema does not declare is passed through to the API
+    rather than rejected here, so an element read back from a newer API than the
+    vendored snapshot can still be written back unchanged.
 
     Args:
         form_id: The form's numeric ID.
@@ -121,8 +125,12 @@ async def replace_form_elements(form_id: int, elements: list[dict[str, object]])
         with no body is reported as {"status": "success", "httpStatus": <code>}.
     """
     # Validated as an array, so each element is checked individually and the
-    # error names the offending index.
-    validate_body("ElementDTO", elements, as_array=True)
+    # error names the offending index. strict=False because the documented way
+    # to use this tool is to read the elements, edit them and write them back:
+    # rejecting a key the API itself produced would leave the caller no way
+    # through except deleting the server's own data, which this write then makes
+    # permanent.
+    validate_body("ElementDTO", elements, as_array=True, strict=False)
 
     # The body is the bare array: [{...}], not {"elements": [{...}]}.
     return dump(await get_client().json(PUT_ELEMENTS, path={"formId": form_id}, body=elements))
@@ -151,15 +159,20 @@ async def update_form_element(form_id: int, element_id: int, changes: dict[str, 
     them.
 
     If no element in the form has the given element_id, nothing is written: a PUT
-    of the unchanged list would report success while changing nothing.
+    of the unchanged list would report success while changing nothing. For the
+    same reason `changes` may not be empty, and may not carry `elementId` —
+    changing an element's own id does not move the edit to another element, it
+    asks the API to replace this one with a different element.
 
     Args:
         form_id: The form's numeric ID.
         element_id: The elementId of the element to change. It must already exist
             in the form; this tool cannot create one.
         changes: The fields to set on that element, as a partial element object.
-            Checked against the vendored ElementDTO schema before anything is
-            read or written, so unknown field names are rejected locally.
+            Must not be empty and must not contain elementId. Field types, enums
+            and ranges are checked against the vendored ElementDTO schema before
+            anything is read or written; a field the schema does not declare is
+            passed through to the API, which has the final say.
 
     Returns:
         The PUT endpoint's ErrorMessage object as JSON: message (string), errors
@@ -168,13 +181,31 @@ async def update_form_element(form_id: int, element_id: int, changes: dict[str, 
         {"status": "success", "httpStatus": <code>}.
 
     Raises:
+        BadRequestError: If changes is empty or contains elementId.
         NotFoundError: If the form has no element with that elementId. No write is
             issued in that case.
     """
-    # Validate first, so a typo costs nothing and never reaches the read-write
-    # window. partial=True because changes is a subset of an element and need not
-    # repeat elementType.
-    validate_body("ElementDTO", changes, partial=True)
+    # Both guards run before the read, so a malformed call costs no requests and
+    # never opens the read-write window.
+    if not changes:
+        raise BadRequestError(
+            f"changes is empty, so there is nothing to apply to element {element_id}. "
+            "Writing anyway would rewrite the form's whole element list for no reason, "
+            "overwriting any edit made since the list was read."
+        )
+    if "elementId" in changes:
+        raise BadRequestError(
+            "changes must not contain elementId. Setting it would not retarget the edit: "
+            f"it would ask the API to give element {element_id} a different id, which "
+            "replaces the element instead of updating it. Pass the element to change as "
+            "the element_id argument."
+        )
+
+    # partial=True because changes is a subset of an element and need not repeat
+    # elementType. strict=False for the same reason as replace_form_elements: a
+    # field present on the live element but not in the vendored snapshot must
+    # still be settable.
+    validate_body("ElementDTO", changes, partial=True, strict=False)
 
     client = get_client()
     current = _element_list(await client.json(LIST_ELEMENTS, path={"formId": form_id}), form_id)

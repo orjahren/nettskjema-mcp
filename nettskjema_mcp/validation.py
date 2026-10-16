@@ -116,19 +116,21 @@ def _build_base_registry() -> tuple[Registry[Any], dict[str, Any]]:
 
 @lru_cache(maxsize=128)
 def _get_schema_and_registry(
-    schema_name: str, partial: bool, as_array: bool
+    schema_name: str, partial: bool, as_array: bool, strict: bool
 ) -> tuple[dict[str, Any], Registry[Any]]:
     """
     Get a schema and registry for validation.
 
-    Schemas are cached per (schema_name, partial, as_array) to avoid rebuilding
-    them on every validation call. The returned schema dict is immutable (read-only)
-    and must not be modified by callers.
+    Schemas are cached per (schema_name, partial, as_array, strict) to avoid
+    rebuilding them on every validation call. The returned schema dict is
+    immutable (read-only) and must not be modified by callers.
 
-    A modified schema with additionalProperties: false at the top level is always
-    created to reject unknown keys. This catches typos and flags fields that are
-    newer than the vendored spec snapshot. Top level only: nested $ref'd schemas
-    are not modified, where the constraint is far likelier to be wrong.
+    When strict=True, additionalProperties: false is injected at the top level so
+    unknown keys are rejected. This catches typos and flags fields that are newer
+    than the vendored spec snapshot. Top level only: nested $ref'd schemas are not
+    modified, where the constraint is far likelier to be wrong. When strict=False
+    the schema is used as the spec writes it, which is what a payload that may be
+    round-tripped from the API needs — see validate_body.
 
     When partial=True, the top-level required constraint is also removed so that
     PATCH endpoints can accept bodies with only a subset of fields.
@@ -137,6 +139,7 @@ def _get_schema_and_registry(
         schema_name: The schema name in components/schemas.
         partial: If True, remove the top-level required constraint.
         as_array: If True, wrap the schema in an array.
+        strict: If True, reject keys the schema does not declare.
 
     Returns:
         A tuple of (schema_dict, registry) ready for validation.
@@ -153,18 +156,21 @@ def _get_schema_and_registry(
             f"Available schemas: {', '.join(sorted(schemas.keys()))}"
         )
 
-    # Always create a modified schema with additionalProperties: false
-    # to reject unknown keys at the top level
     modified_schema = copy.deepcopy(schemas[schema_name])
-    modified_schema["additionalProperties"] = False
+
+    if strict:
+        # Reject unknown keys at the top level
+        modified_schema["additionalProperties"] = False
 
     if partial:
         # For partial validation, also remove the required constraint
         if "required" in modified_schema:
             del modified_schema["required"]
 
-    # Create a temporary document with the modified schema
-    suffix = "_Partial" if partial else "_Strict"
+    # Create a temporary document with the modified schema. The suffix names
+    # every variant distinctly, so two variants of one schema cannot collide on
+    # the registry URI.
+    suffix = f"_{'Partial' if partial else 'Full'}{'Strict' if strict else 'Open'}"
     temp_doc = {
         "components": {"schemas": {f"{schema_name}{suffix}": modified_schema}},
         # Include all other schemas so nested $refs resolve
@@ -196,14 +202,25 @@ def validate_body(
     *,
     partial: bool = False,
     as_array: bool = False,
+    strict: bool = True,
 ) -> None:
     """
     Validate a request body against a vendored OpenAPI schema.
 
-    Unknown keys are rejected locally to catch typos and flag fields that are
-    newer than the vendored spec snapshot. The error message names close matches
-    among the schema's real property names, turning a typo into an instant fix
-    and a stale snapshot into a legible complaint instead of a dead end.
+    By default unknown keys are rejected locally to catch typos and flag fields
+    that are newer than the vendored spec snapshot. The error message names close
+    matches among the schema's real property names, turning a typo into an
+    instant fix and a stale snapshot into a legible complaint instead of a dead
+    end.
+
+    Pass strict=False for a payload the caller may have read back from the API.
+    Rejecting a key the API itself produced is worse than not checking at all:
+    the caller cannot remove a field it never wrote, so the only way past the
+    validator would be to drop data the server sent — which a whole-list write
+    would then delete. Element payloads are the case this exists for; flat
+    settings objects, which the caller always composes itself, stay strict.
+    Everything else in the schema — types, enums, required fields, lengths — is
+    checked either way.
 
     When partial=True, the top-level required constraint is removed so that
     PATCH endpoints can accept bodies with only a subset of fields. Nested
@@ -212,20 +229,21 @@ def validate_body(
     behavior — partial updates target specific top-level fields, and any nested
     object that is supplied is replaced whole.
 
-    The prepared schema is cached per (schema_name, partial, as_array) to avoid
-    rebuilding it on every call. The cache is read-only and immutable.
+    The prepared schema is cached per (schema_name, partial, as_array, strict)
+    to avoid rebuilding it on every call. The cache is read-only and immutable.
 
     Args:
         schema_name: The schema name in components/schemas (e.g., "FormSettingsDTO").
         body: The request body to validate.
         partial: If True, remove the top-level required constraint.
         as_array: If True, wrap the schema in {"type": "array", "items": <schema>}.
+        strict: If False, accept keys the vendored schema does not declare.
 
     Raises:
         ValueError: If schema_name does not exist in the spec.
         BadRequestError: If validation fails.
     """
-    schema, registry = _get_schema_and_registry(schema_name, partial, as_array)
+    schema, registry = _get_schema_and_registry(schema_name, partial, as_array, strict)
     validator = jsonschema.Draft202012Validator(schema, registry=registry)
 
     # Collect all validation errors, not just the first
@@ -264,7 +282,12 @@ def validate_body(
                 if len(parts) >= 2:
                     unknown_field = parts[1]
 
-            message = f"not in the vendored {schema_name} schema snapshot"
+            # Name the offending key. The JSON path only locates the object that
+            # contained it — on an array that is just "$[0]" — so without this a
+            # novel field name never appears anywhere in the error, and only a
+            # near-miss typo is legible through the suggestions below.
+            named = f"{unknown_field!r} is " if unknown_field else ""
+            message = f"{named}not in the vendored {schema_name} schema snapshot"
             if unknown_field and properties:
                 # Suggest close matches
                 matches = difflib.get_close_matches(unknown_field, properties, n=3, cutoff=0.6)

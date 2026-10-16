@@ -65,10 +65,11 @@ async def test_get_form_elements_does_not_send_the_answer_parameter(
     """
     get_form_elements() sends no query parameters at all.
 
-    The path has two handlers behind it and "?answer" selects the respondent
-    view, so sending the parameter by accident would answer a different
-    question than the caller asked. The vendored spec declares no query
-    parameter on this operation, so the correct request carries none.
+    The vendored spec declares exactly one parameter on this operation, formId,
+    in the path — no query parameter of any name, including "answer". The client
+    can attach one, so this pins that the tool does not: a parameter nobody asked
+    for could select a different view of the same path and answer a different
+    question than the caller put.
     """
     route = respx_mock.get(ELEMENTS_URL).mock(return_value=httpx.Response(200, json=THREE_ELEMENTS))
 
@@ -224,18 +225,31 @@ async def test_replace_form_elements_accepts_several_element_types(
     assert _body(route) == elements
 
 
-async def test_replace_form_elements_rejects_an_unknown_key_locally(
+async def test_replace_form_elements_accepts_an_unknown_key(
     respx_mock: respx.MockRouter,
 ) -> None:
-    """A misspelled element field is rejected before the whole list is overwritten."""
+    """
+    A key the vendored snapshot does not declare is forwarded, not rejected.
+
+    The documented way to use this tool is to read the elements, edit them and
+    write them back. If the live API has gained a field since the snapshot was
+    committed, rejecting it here would leave the caller nothing to do but delete
+    data the server sent — which this whole-list write then makes permanent. The
+    API has the final say on field names; the local check is for types, enums
+    and required fields.
+    """
     route = respx_mock.put(ELEMENTS_URL).mock(return_value=httpx.Response(200, json={}))
 
-    with pytest.raises(ToolError) as caught:
-        await replace_form_elements(123, [{"elementType": "TEXT", "txet": "typo"}])
+    element: dict[str, object] = {
+        "elementId": 1,
+        "elementType": "TEXT",
+        "text": "Hello",
+        "fieldFromTheFuture": 1,
+    }
+    await replace_form_elements(123, [element])
 
-    message = str(caught.value)
-    assert "vendored" in message or "schema" in message
-    assert route.call_count == 0
+    assert route.call_count == 1
+    assert _body(route) == [element]
 
 
 async def test_update_form_element_reads_patches_and_puts_the_whole_list(
@@ -252,10 +266,18 @@ async def test_update_form_element_reads_patches_and_puts_the_whole_list(
     assert get_route.call_count == 1
     assert put_route.call_count == 1
 
+    # Byte-for-byte: structural equality would miss a key added to the patched
+    # element, or its keys coming back in a different order.
+    expected = [dict(e) for e in THREE_ELEMENTS]
+    expected[1]["text"] = "new"
+    assert put_route.calls.last.request.content == json.dumps(
+        expected, separators=(",", ":")
+    ).encode("utf-8")
+
     sent = _body(put_route)
     assert isinstance(sent, list)
     assert len(sent) == 3
-    # Order is preserved and the untouched elements are sent back byte-identical.
+    # Order is preserved and the untouched elements are sent back unchanged.
     assert sent[0] == THREE_ELEMENTS[0]
     assert sent[2] == THREE_ELEMENTS[2]
     # Only the target's text changed; its other fields survive.
@@ -309,16 +331,16 @@ async def test_update_form_element_replaces_nested_lists_whole(
 async def test_update_form_element_validates_changes_before_reading(
     respx_mock: respx.MockRouter,
 ) -> None:
-    """An unknown key in changes fails before either request is issued."""
+    """A bad value in changes fails before either request is issued."""
     get_route = respx_mock.get(ELEMENTS_URL).mock(
         return_value=httpx.Response(200, json=THREE_ELEMENTS)
     )
     put_route = respx_mock.put(ELEMENTS_URL).mock(return_value=httpx.Response(200, json={}))
 
     with pytest.raises(ToolError) as caught:
-        await update_form_element(123, 22, {"txet": "typo"})
+        await update_form_element(123, 22, {"elementType": "NOPE"})
 
-    assert "vendored" in str(caught.value) or "schema" in str(caught.value)
+    assert "elementType" in str(caught.value)
     assert get_route.call_count == 0
     assert put_route.call_count == 0
 
@@ -344,6 +366,50 @@ async def test_update_form_element_does_not_validate_the_servers_own_elements(
     assert isinstance(sent, list)
     assert sent[0]["fieldFromTheFuture"] == 1
     assert sent[0]["text"] == "new"
+
+
+async def test_update_form_element_rejects_empty_changes(respx_mock: respx.MockRouter) -> None:
+    """
+    An empty changes dict fails instead of rewriting the list for no reason.
+
+    The PUT would be a no-op in content, but it still overwrites whatever someone
+    else wrote between the read and the write — the hazard this tool's own
+    docstring warns about, incurred for no benefit at all.
+    """
+    get_route = respx_mock.get(ELEMENTS_URL).mock(
+        return_value=httpx.Response(200, json=THREE_ELEMENTS)
+    )
+    put_route = respx_mock.put(ELEMENTS_URL).mock(return_value=httpx.Response(200, json={}))
+
+    with pytest.raises(ToolError) as caught:
+        await update_form_element(123, 22, {})
+
+    assert "empty" in str(caught.value)
+    assert get_route.call_count == 0
+    assert put_route.call_count == 0
+
+
+async def test_update_form_element_rejects_element_id_in_changes(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """
+    changes may not carry elementId: it would replace the element, not retarget.
+
+    ElementDTO declares elementId, so the schema accepts it. Applied, it gives the
+    matched element a different id, which asks the API to swap it for another
+    element rather than update the one the caller named.
+    """
+    get_route = respx_mock.get(ELEMENTS_URL).mock(
+        return_value=httpx.Response(200, json=THREE_ELEMENTS)
+    )
+    put_route = respx_mock.put(ELEMENTS_URL).mock(return_value=httpx.Response(200, json={}))
+
+    with pytest.raises(ToolError) as caught:
+        await update_form_element(123, 22, {"elementId": 99, "text": "new"})
+
+    assert "elementId" in str(caught.value)
+    assert get_route.call_count == 0
+    assert put_route.call_count == 0
 
 
 async def test_update_form_element_rejects_a_non_list_response(

@@ -636,6 +636,29 @@ async def test_json_allows_accept_override(
     assert request.headers["Accept"] == "text/plain"
 
 
+async def test_json_override_replaces_a_default_whatever_its_casing(
+    client: NettskjemaClient, respx_mock: respx.MockRouter
+) -> None:
+    """
+    A differently cased override replaces the default instead of joining it.
+
+    httpx keeps both keys when they differ only by case, and the server then
+    sees one header carrying both values: "application/json, text/plain". The
+    Authorization guard already normalises its *check*; this pins the *merge*.
+    """
+    route = respx_mock.get(f"{BASE_URL}/form/1/info").mock(
+        return_value=httpx.Response(200, json={"formId": 1})
+    )
+
+    await client.json(
+        FORM_INFO,
+        path={"formId": 1},
+        headers={"accept": "text/plain"},
+    )
+
+    assert route.calls.last.request.headers["accept"] == "text/plain"
+
+
 async def test_json_rejects_headers_with_control_characters(client: NettskjemaClient) -> None:
     """json raises BadRequestError when a header value contains control characters."""
     with pytest.raises(BadRequestError) as excinfo:

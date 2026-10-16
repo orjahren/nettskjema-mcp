@@ -525,6 +525,11 @@ class NettskjemaClient:
                         f"Header {name!r} contains control characters (CR, LF, NUL, etc.) "
                         "and cannot be used. Header values must not contain control characters."
                     )
+                # Replace a default case-insensitively rather than adding a second
+                # key beside it: httpx keeps both, and the server sees one header
+                # with the two values joined by a comma.
+                for existing in [k for k in headers if k.lower() == name.lower()]:
+                    del headers[existing]
                 headers[name] = value
         params = _query_params(query)
         return self._client().build_request(

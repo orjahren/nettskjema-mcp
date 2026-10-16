@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Meta tools: who the credentials belong to, and how the server is configured.
 
 This module is the template every other tool module follows:

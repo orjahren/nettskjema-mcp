@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Error types for Nettskjema API interactions."""
 
 from fastmcp.exceptions import ToolError

@@ -190,7 +190,7 @@ These are not errors. The response body contains per-item status.
 
 - Never log or print access tokens, client secrets, or request/response bodies
 - Answers may contain sensitive personal data
-- This repo is MIT-licensed and intended for publication: no UiO-internal paths or class names
+- This repo is GPL-3.0-or-later and intended for publication: no UiO-internal paths or class names
 - E2E tests have a production guard that aborts if pointed at `nettskjema.no`
 
 ## Resources

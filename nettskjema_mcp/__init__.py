@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Model Context Protocol server for the Nettskjema v3 API.
 
 The server itself lives in :mod:`nettskjema_mcp.server` and the tools in

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Invitation reminder tool.
 
 The tool sends reminder emails to every pending invitation on a form, in one

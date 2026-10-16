@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Admin tools: TSD and Educloud activation, and image upload/download.
 
 The TSD and Educloud activation tokens are credentials, exactly like the OAuth

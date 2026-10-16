@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Tool modules for the Nettskjema MCP server.
 
 Each module registers its own tools with the shared server when it is

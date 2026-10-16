@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Form read tools: listing, lookup, and fetching form metadata and structure."""
 
 from nettskjema_mcp.client import dump, get_client

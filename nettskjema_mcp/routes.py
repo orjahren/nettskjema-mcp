@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Route registry and OpenAPI spec loader for Nettskjema MCP tools."""
 
 import json

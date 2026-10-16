@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Pooled async HTTP client for the Nettskjema v3 API.
 
 Every routed tool goes through :class:`NettskjemaClient`. It owns a single

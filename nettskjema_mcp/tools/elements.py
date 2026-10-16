@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Element tools: reading a form's elements and writing them back.
 
 There is no endpoint that adds, patches or deletes a single element. The only

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Export tools: CSV, Excel, SPSS syntax, and codebook upload.
 
 CSV and SPSS exports return text in an envelope with a size signal and truncation

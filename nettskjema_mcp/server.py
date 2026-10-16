@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """The FastMCP server: the shared instance, the error bridge, and the entry point.
 
 Tool modules do not create servers of their own. They import :func:`tool` from

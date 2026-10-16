@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Submission tools: read submissions, deliver a response, and delete responses.
 
 Two of the deletes differ by one character. ``DELETE /form/{formId}/submission``

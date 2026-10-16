@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Smoke test script for the Nettskjema MCP server.
 
 Exercises one read-only tool from each module against a live Nettskjema instance

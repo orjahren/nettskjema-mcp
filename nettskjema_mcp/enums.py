@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Oliver Ruste Jahren
 """Enums extracted from the Nettskjema v3 OpenAPI spec.
 
 All enums are defined inline on DTO properties in the spec, not as top-level

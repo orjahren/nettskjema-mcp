@@ -144,6 +144,7 @@ def main() -> None:
 # and `tool` exist above. This block is the integration point: a new tool
 # module is one line here and nothing else.
 from nettskjema_mcp.tools import (  # noqa: E402
+    elements,  # noqa: F401
     forms,  # noqa: F401
     meta,  # noqa: F401
 )

@@ -25,7 +25,14 @@ pytestmark = [
 FORMS = [{"formId": 1, "title": "Test Form"}]
 FORM_METADATA = {"formId": 1, "title": "Test Form", "titleShort": "test-form"}
 FORM_INFO = {"owner": "test-client@apiclient", "created": "2024-01-01T00:00:00Z"}
-FORM_SETTINGS = {"title": "Test Form", "description": "A test form"}
+FORM_SETTINGS = {
+    "title": "Test Form",
+    "formType": "DEFAULT",
+    "languageCode": "en",
+    "respondentGroup": "ALL",
+    "collectsPersonalData": False,
+    "sensitivePersonalDataCollected": False,
+}
 FORM_VALIDATION = {"titleRequired": True}
 FORM_DEFINITION = {"elements": [{"elementId": 1, "elementType": "TEXT"}]}
 PERSONAL_DATA_FORMS = [{"formId": 1, "collectsPersonalData": True}]

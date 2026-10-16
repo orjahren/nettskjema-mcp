@@ -137,51 +137,25 @@ def test_unknown_schema_name_raises_clear_error() -> None:
     assert "NoSuchSchemaDTO" in str(e.value)
 
 
-def test_pattern_errors_do_not_leak_instance_value() -> None:
+def test_a_length_violation_reports_the_limit_and_not_the_value() -> None:
     """
-    pattern/maxLength/minLength errors must not embed the instance value.
+    A maxLength failure names the limit from the schema, never the caller's value.
 
-    jsonschema's default messages for these validators include the failing value,
-    which would leak credentials if a token field later gains such a constraint.
-    The fallback in validation.py must build safe messages instead.
-
-    This test creates a simple schema with maxLength to construct a violation, then
-    verifies the rendering does not leak the secret. No schema in today's snapshot
-    exercises this path, but a snapshot refresh could add one.
+    jsonschema's own message quotes the whole offending string back. That is a
+    disclosure risk the day a credential field gains a length limit, and it is a
+    legibility problem today: AnswerOptionDTO.text allows 700 characters, so the
+    default message is 700 characters of the caller's own input. The limit comes
+    from the schema and is safe to state; the value comes from the caller and is
+    not. This goes through validate_body on a real snapshot schema rather than a
+    hand-built validator, so deleting the branch in validation.py reddens it.
     """
-    from jsonschema import Draft202012Validator
+    secret = "SECRET-" + "x" * 800
 
-    # Create a simple schema with a maxLength constraint
-    schema = {
-        "type": "object",
-        "properties": {
-            "token": {"type": "string", "maxLength": 5}
-        }
-    }
+    with pytest.raises(BadRequestError) as e:
+        validate_body("AnswerOptionDTO", {"text": secret})
 
-    # Create a validator
-    validator = Draft202012Validator(schema)
-
-    # Construct a violation with a secret value that exceeds maxLength
-    secret_value = "SECRET123withNumbers"
-    errors = list(validator.iter_errors({"token": secret_value}))
-
-    # Verify jsonschema embeds the instance (this is what we're protecting against)
-    assert len(errors) == 1
-    assert secret_value in errors[0].message
-
-    # Now render the errors the way validate_body does
-    field_errors: dict[str, list[str]] = {}
-    for error in errors:
-        path = error.json_path or "/"
-        if error.validator in ("pattern", "maxLength", "minLength"):
-            message = f"failed the {error.validator} constraint"
-        else:
-            message = error.message
-        field_errors.setdefault(path, []).append(message)
-
-    # The rendered message must not contain the secret
-    rendered = str(field_errors)
-    assert secret_value not in rendered
-    # But it should mention the constraint
-    assert "maxLength" in rendered.lower() or "constraint" in rendered.lower()
+    rendered = str(e.value)
+    assert secret not in rendered
+    assert "SECRET" not in rendered
+    assert "700" in rendered
+    assert "text" in rendered

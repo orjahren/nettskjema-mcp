@@ -294,11 +294,17 @@ def validate_body(
                 if matches:
                     suggestions = ", ".join(repr(m) for m in matches)
                     message += f"; did you mean {suggestions}?"
-        elif error.validator in ("pattern", "maxLength", "minLength"):
-            # These validators embed the failing instance in their default message.
-            # Build the message from the keyword and path only, to avoid leaking
-            # credential values when a token field later gains such a constraint.
-            message = f"failed the {error.validator} constraint"
+        elif error.validator == "maxLength":
+            # jsonschema's own message quotes the whole offending value back. The
+            # snapshot carries 25 maxLength, 27 minLength and 6 pattern constraints,
+            # so this fires on ordinary input today; it would also quote a credential
+            # the day a token field gains a limit. State the limit, which comes from
+            # the schema, and never the value, which comes from the caller.
+            message = f"must be at most {error.validator_value} characters"
+        elif error.validator == "minLength":
+            message = f"must be at least {error.validator_value} characters"
+        elif error.validator == "pattern":
+            message = f"must match the pattern {error.validator_value!r}"
         else:
             message = error.message
 

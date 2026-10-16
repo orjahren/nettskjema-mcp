@@ -136,7 +136,7 @@ async def test_a_typed_error_surfaces_as_a_tool_error(respx_mock: respx.MockRout
             404,
             json={
                 "message": "No such user",
-                "errorKeysAndErrorMessages": {"username": ["is unknown"]},
+                "errors": {"username": ["is unknown"]},
             },
         )
     )
@@ -168,7 +168,7 @@ async def test_a_typed_error_keeps_its_detail_through_the_server(
             400,
             json={
                 "message": "Validation failed",
-                "errorKeysAndErrorMessages": {
+                "errors": {
                     "title": ["must not be blank"],
                     "elements[2].questionText": ["is too long"],
                 },

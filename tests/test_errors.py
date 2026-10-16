@@ -19,6 +19,7 @@ from nettskjema_mcp.errors import (
     error_for_status,
     to_tool_error,
 )
+from nettskjema_mcp.routes import load_spec
 
 
 @pytest.mark.parametrize(
@@ -43,7 +44,7 @@ def test_field_errors_are_preserved() -> None:
     """Field-level validation errors should be extracted and preserved."""
     body = {
         "message": "Validation error",
-        "errorKeysAndErrorMessages": {"title": ["must not be blank"]},
+        "errors": {"title": ["must not be blank"]},
     }
     exc = error_for_status(400, body)
     assert exc.field_errors == {"title": ["must not be blank"]}
@@ -61,7 +62,7 @@ def test_whole_rendered_error_fits_the_context_budget() -> None:
     """A huge backend message plus a hundred field errors stay inside the budget."""
     body = {
         "message": "x" * 50_000,
-        "errorKeysAndErrorMessages": {f"field{n}": ["y" * 500] for n in range(100)},
+        "errors": {f"field{n}": ["y" * 500] for n in range(100)},
     }
 
     rendered = str(error_for_status(400, body))
@@ -73,7 +74,7 @@ def test_rendered_error_budget_holds_for_long_field_names() -> None:
     """The budget survives the worst case: every name and message oversized too."""
     body = {
         "message": "x" * 50_000,
-        "errorKeysAndErrorMessages": {"n" * 2000 + str(i): ["y" * 2000] for i in range(100)},
+        "errors": {"n" * 2000 + str(i): ["y" * 2000] for i in range(100)},
     }
 
     rendered = str(error_for_status(400, body))
@@ -99,8 +100,8 @@ def test_string_body_is_bounded() -> None:
 
 
 def test_malformed_field_errors_do_not_crash_rendering() -> None:
-    """A non-dict errorKeysAndErrorMessages is ignored rather than breaking __str__."""
-    exc = error_for_status(400, {"message": "bad", "errorKeysAndErrorMessages": "not a dict"})
+    """A non-dict errors value is ignored rather than breaking __str__."""
+    exc = error_for_status(400, {"message": "bad", "errors": "not a dict"})
 
     assert str(exc) == "bad"
     assert exc.field_errors == {}
@@ -153,3 +154,42 @@ def test_to_tool_error_returns_fastmcp_tool_error() -> None:
     tool_error = to_tool_error(exc)
     assert isinstance(tool_error, FastMCPToolError)
     assert str(exc) in str(tool_error)
+
+
+def test_error_keys_are_grounded_in_the_vendored_spec() -> None:
+    """
+    The keys we read from error bodies must match the vendored ErrorMessage schema.
+
+    This test prevents drift: the code reads errors and confirmForceCleanupErrors
+    from response bodies, and those keys must be documented in the spec. A key
+    that is not in the schema would always come back empty in production.
+    """
+    spec = load_spec()
+    error_message_schema = spec["components"]["schemas"]["ErrorMessage"]
+    properties = set(error_message_schema.get("properties", {}).keys())
+
+    # The keys error_for_status and _field_errors read from ErrorMessage bodies
+    assert "message" in properties
+    assert "errors" in properties
+    assert "confirmForceCleanupErrors" in properties
+
+
+def test_force_cleanup_errors_are_rendered_distinctly() -> None:
+    """confirmForceCleanupErrors are rendered separately with actionable guidance."""
+    body = {
+        "message": "Settings validation failed",
+        "errors": {"title": ["must not be blank"]},
+        "confirmForceCleanupErrors": {"openFrom": ["conflicts with existing data"]},
+    }
+    exc = error_for_status(400, body)
+
+    rendered = str(exc)
+
+    # Ordinary errors are rendered
+    assert "title" in rendered
+    assert "must not be blank" in rendered
+
+    # Force-cleanup errors are rendered distinctly
+    assert "force_cleanup=True" in rendered
+    assert "openFrom" in rendered
+    assert "conflicts with existing data" in rendered

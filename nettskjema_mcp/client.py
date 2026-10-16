@@ -26,6 +26,7 @@ from nettskjema_mcp.errors import (
     BadRequestError,
     PartialSuccessError,
     UpstreamError,
+    _extract_field_errors,
     error_for_status,
     trim_excerpt,
 )
@@ -560,11 +561,25 @@ def _param_str(value: object) -> str:
 
 
 def _field_errors(payload: object) -> dict[str, list[str]] | None:
-    """Extract per-field errors from a body, if it carries any."""
+    """
+    Extract per-field errors from an ErrorMessage response body.
+
+    The vendored spec documents errors as the field-error object in ErrorMessage.
+    This function extracts and validates those errors, filtering out the spec's
+    special properties (empty, all) that are not field errors.
+
+    Args:
+        payload: The decoded response body.
+
+    Returns:
+        A dict of field errors, or None if the body carries none.
+    """
     if isinstance(payload, dict):
-        errors = payload.get("errorKeysAndErrorMessages")
-        if isinstance(errors, dict):
-            return errors
+        errors_obj = payload.get("errors")
+        if errors_obj is not None:
+            field_errors = _extract_field_errors(errors_obj)
+            if field_errors:
+                return field_errors
     return None
 
 

@@ -164,7 +164,7 @@ async def test_update_form_settings_surfaces_a_207(respx_mock: respx.MockRouter)
             207,
             json={
                 "message": "Some settings could not be updated",
-                "errorKeysAndErrorMessages": {
+                "errors": {
                     "openFrom": ["must be before openTo"],
                     "title": ["is reserved"],
                 },

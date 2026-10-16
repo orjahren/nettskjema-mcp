@@ -44,6 +44,7 @@ class NettskjemaError(Exception):
         *,
         status: int | None = None,
         field_errors: dict[str, list[str]] | None = None,
+        force_cleanup_errors: dict[str, list[str]] | None = None,
     ) -> None:
         """
         Initialize a Nettskjema error.
@@ -52,11 +53,13 @@ class NettskjemaError(Exception):
             message: Human-readable error description.
             status: HTTP status code that triggered this error.
             field_errors: Per-field validation errors, if any.
+            force_cleanup_errors: Errors that force_cleanup=True would override, if any.
         """
         super().__init__(message)
         self.message = message
         self.status = status
         self.field_errors = field_errors or {}
+        self.force_cleanup_errors = force_cleanup_errors or {}
 
     def __str__(self) -> str:
         """
@@ -65,6 +68,10 @@ class NettskjemaError(Exception):
         Field errors come from the backend and are otherwise unbounded in both
         count and length, so they are capped the same way response-body excerpts
         are. Anything left out is counted rather than silently dropped.
+
+        Force-cleanup errors are rendered separately after ordinary errors, as
+        they are actionable: a model that sees them knows there is a retry available
+        with force_cleanup=True.
         """
         parts = [self.message]
         rendered = 0
@@ -80,6 +87,20 @@ class NettskjemaError(Exception):
                 rendered += 1
         if omitted:
             parts.append(f"… and {omitted} more field error(s) not shown.")
+
+        # Render force-cleanup errors distinctly, sharing the same cap
+        if self.force_cleanup_errors:
+            parts.append("The following errors can be overridden with force_cleanup=True:")
+            for field, errors in self.force_cleanup_errors.items():
+                for error in errors:
+                    if rendered >= MAX_FIELD_ERRORS_RENDERED:
+                        omitted += 1
+                        continue
+                    name = trim_excerpt(str(field), MAX_FIELD_ERROR_LENGTH)
+                    detail = trim_excerpt(str(error), MAX_FIELD_ERROR_LENGTH)
+                    parts.append(f"{name} → {detail}")
+                    rendered += 1
+
         return "\n".join(parts)
 
 
@@ -127,6 +148,36 @@ _STATUS_MAP: dict[int, type[NettskjemaError]] = {
 }
 
 
+def _extract_field_errors(errors_obj: object) -> dict[str, list[str]]:
+    """
+    Extract per-field errors from an ErrorMessage.errors object.
+
+    The vendored spec documents errors as an object with additionalProperties
+    mapping field names to arrays of error messages. The spec also shows two
+    special properties (empty, all) that are not field errors and must be skipped.
+
+    Args:
+        errors_obj: The errors value from an ErrorMessage response body.
+
+    Returns:
+        A dict mapping field names to arrays of error messages. Empty if the
+        value is not a dict or contains no valid field errors.
+    """
+    if not isinstance(errors_obj, dict):
+        return {}
+
+    field_errors: dict[str, list[str]] = {}
+    for key, value in errors_obj.items():
+        # Skip the spec's special properties that are not field errors
+        if key in ("empty", "all"):
+            continue
+        # Only include entries whose value is a list of strings
+        if isinstance(value, list) and all(isinstance(item, str) for item in value):
+            field_errors[key] = value
+
+    return field_errors
+
+
 def error_for_status(status: int, body: object) -> NettskjemaError:
     """
     Create an appropriate exception for an HTTP error response.
@@ -143,16 +194,28 @@ def error_for_status(status: int, body: object) -> NettskjemaError:
     """
     message = "Request failed"
     field_errors: dict[str, list[str]] | None = None
+    force_cleanup_errors: dict[str, list[str]] | None = None
 
     # Extract message and field errors from body if it's a dict
     if isinstance(body, dict):
         raw_message = body.get("message")
         if raw_message:
             message = trim_excerpt(str(raw_message), MAX_MESSAGE_LENGTH)
-        errors = body.get("errorKeysAndErrorMessages")
-        # Guard the type: a malformed value here would otherwise crash __str__.
-        if isinstance(errors, dict):
-            field_errors = errors
+
+        # Extract field errors from the errors object (ErrorMessage schema)
+        errors_obj = body.get("errors")
+        if errors_obj is not None:
+            field_errors = _extract_field_errors(errors_obj)
+            if not field_errors:
+                field_errors = None
+
+        # Extract force-cleanup errors (ErrorMessage.confirmForceCleanupErrors)
+        cleanup_obj = body.get("confirmForceCleanupErrors")
+        if cleanup_obj is not None:
+            force_cleanup_errors = _extract_field_errors(cleanup_obj)
+            if not force_cleanup_errors:
+                force_cleanup_errors = None
+
     elif isinstance(body, str):
         message = trim_excerpt(body, MAX_MESSAGE_LENGTH)
 
@@ -166,7 +229,9 @@ def error_for_status(status: int, body: object) -> NettskjemaError:
         )
 
     error_class = _STATUS_MAP.get(status, NettskjemaError)
-    return error_class(message, status=status, field_errors=field_errors)
+    return error_class(
+        message, status=status, field_errors=field_errors, force_cleanup_errors=force_cleanup_errors
+    )
 
 
 def to_tool_error(exc: NettskjemaError) -> ToolError:

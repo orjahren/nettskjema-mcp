@@ -26,6 +26,7 @@ import tests.tools
 from tests.conftest import validate_response_fixture
 
 # Import all fixtures from test modules
+from tests.tools.test_admin import UPLOAD_IMAGE_RESPONSE
 from tests.tools.test_attachments import UPLOAD_SUCCESS_RESPONSE
 from tests.tools.test_elements import REJECTION_BODY, THREE_ELEMENTS
 from tests.tools.test_forms_read import (
@@ -69,6 +70,7 @@ ALL_FIXTURES: list[tuple[str, str, Any, str]] = [
         UPLOAD_SUCCESS_RESPONSE,
         "UPLOAD_SUCCESS_RESPONSE",
     ),
+    ("POST", "/image", UPLOAD_IMAGE_RESPONSE, "UPLOAD_IMAGE_RESPONSE"),
 ]
 
 # Module-level JSON constants that are not response fixtures, with the reason.

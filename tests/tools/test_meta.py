@@ -258,6 +258,7 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
         "export_form_excel",  # writes Excel to output_path, overwrites existing files
         "export_form_csv",  # writes CSV to output_path when given, overwrites existing files
         "get_answer_attachment",  # writes attachment to output_path, overwrites existing files
+        "get_image",  # writes image to output_path, overwrites existing files
     }
 
     for registered in await mcp.list_tools():

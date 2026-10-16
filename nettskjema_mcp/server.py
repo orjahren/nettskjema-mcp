@@ -143,6 +143,9 @@ def main() -> None:
 # Tool modules are imported for their registration side effects, after `mcp`
 # and `tool` exist above. This block is the integration point: a new tool
 # module is one line here and nothing else.
-from nettskjema_mcp.tools import meta  # noqa: E402, F401
+from nettskjema_mcp.tools import (  # noqa: E402
+    forms,  # noqa: F401
+    meta,  # noqa: F401
+)
 
 __all__ = ["bridge_errors", "main", "mcp", "tool"]

@@ -185,13 +185,16 @@ class NettskjemaClient:
             body: Request body. Sent as-is, so a list becomes a bare JSON array.
             content: Raw request body as bytes. Mutually exclusive with body.
             headers: Additional headers to merge on top of the defaults
-                (Authorization and Accept). May not replace Authorization.
+                (Authorization and Accept). Supplied headers replace the defaults,
+                except Authorization which is rejected. Overriding Accept will
+                break decoding: json() expects a JSON response.
 
         Returns:
             The decoded JSON body, or a no-content marker when the body was empty.
 
         Raises:
-            BadRequestError: If both body and content are provided.
+            BadRequestError: If both body and content are provided, or if headers
+                tries to replace Authorization.
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
             PartialSuccessError: For a clean 2xx from a route in
                 ERROR_BODY_ROUTES whose body reports the change was rejected.
@@ -499,12 +502,15 @@ class NettskjemaClient:
             raise self._transport_error(exc) from exc
         headers = {"Authorization": f"Bearer {token}", "Accept": accept}
         if extra_headers is not None:
+            # Check for collisions with defaults, case-insensitively
+            normalized = {k.lower(): k for k in extra_headers}
+            if "authorization" in normalized:
+                raise BadRequestError(
+                    "Cannot replace the Authorization header through extra_headers. "
+                    "The header is set automatically from the OAuth2 token."
+                )
+            # Merge supplied headers, which may replace Accept or add new ones
             for name, value in extra_headers.items():
-                if name == "Authorization":
-                    raise BadRequestError(
-                        "Cannot replace the Authorization header through extra_headers. "
-                        "The header is set automatically from the OAuth2 token."
-                    )
                 headers[name] = value
         params = _query_params(query)
         return self._client().build_request(

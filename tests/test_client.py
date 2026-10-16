@@ -605,6 +605,18 @@ async def test_json_rejects_authorization_replacement(client: NettskjemaClient) 
     assert "Cannot replace the Authorization header" in str(excinfo.value)
 
 
+async def test_json_rejects_lowercase_authorization_replacement(client: NettskjemaClient) -> None:
+    """json raises BadRequestError when headers tries to replace authorization (lowercase)."""
+    with pytest.raises(BadRequestError) as excinfo:
+        await client.json(
+            FORM_INFO,
+            path={"formId": 1},
+            headers={"authorization": "Bearer fake-token"},
+        )
+
+    assert "Cannot replace the Authorization header" in str(excinfo.value)
+
+
 def test_dump_renders_readable_json() -> None:
     """dump pretty-prints with real Unicode characters, not escapes."""
     rendered = dump({"title": "Spørreskjema", "ids": [1, 2]})

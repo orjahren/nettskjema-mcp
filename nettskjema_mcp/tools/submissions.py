@@ -320,8 +320,8 @@ async def delete_submissions(form_id: int, submission_ids: list[int]) -> str:
 
     This is the scoped delete, and the one to use whenever specific responses
     are meant: it removes exactly the submissions whose ids are given, and
-    nothing else. Do not confuse it with delete_all_submissions, which wipes
-    every response the form has and ignores any id list. Deleted responses are
+    nothing else. Do not confuse it with delete_all_submissions, which deletes
+    every response the form has and takes no id list. Deleted responses are
     gone; the API offers no undo for them.
 
     Get submission ids from get_submission_metadata or list_my_submissions. An

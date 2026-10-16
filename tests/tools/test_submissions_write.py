@@ -156,6 +156,11 @@ async def test_delete_all_submissions_sends_no_body(respx_mock: respx.MockRouter
     The spec marks the request body optional on an operation whose summary is
     "Delete all submissions", so sending ids could only mislead a reader of the
     call into thinking the blast radius was limited.
+
+    The headers are pinned alongside the bytes: the whole safety argument for
+    this tool is that a bodiless DELETE is acceptable here, and a request
+    announcing a JSON body it does not have is not that. A later change to the
+    client that always set Content-Type would otherwise pass unnoticed.
     """
     route = respx_mock.delete(f"{TEST_BASE_URL}/form/123/submissions").mock(
         return_value=httpx.Response(200)
@@ -164,7 +169,10 @@ async def test_delete_all_submissions_sends_no_body(respx_mock: respx.MockRouter
     await delete_all_submissions(123)
 
     assert route.call_count == 1
-    assert route.calls.last.request.content == b""
+    request = route.calls.last.request
+    assert request.content == b""
+    assert "content-type" not in request.headers
+    assert "content-length" not in request.headers
 
 
 async def test_delete_all_submissions_takes_no_id_parameter() -> None:

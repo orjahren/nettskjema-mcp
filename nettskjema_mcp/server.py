@@ -146,6 +146,7 @@ def main() -> None:
 from nettskjema_mcp.tools import (  # noqa: E402
     answers,  # noqa: F401
     elements,  # noqa: F401
+    exports,  # noqa: F401
     forms,  # noqa: F401
     meta,  # noqa: F401
     submissions,  # noqa: F401

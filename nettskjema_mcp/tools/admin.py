@@ -125,8 +125,7 @@ async def upload_image(file_path: str) -> str:
     path = Path(file_path).expanduser().resolve()
     if not path.exists():
         raise NotFoundError(
-            f"Cannot upload {file_path!r}: the file does not exist. "
-            "Check the path and try again."
+            f"Cannot upload {file_path!r}: the file does not exist. Check the path and try again."
         )
     if not path.is_file():
         raise NotFoundError(

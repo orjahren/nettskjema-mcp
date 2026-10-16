@@ -25,9 +25,7 @@ pytestmark = [
 # Sample response fixtures
 TRANSCRIBED_JSON_RESPONSE = {
     "text": "This is a transcription.",
-    "segments": [
-        {"start": 0.0, "end": 2.5, "text": "This is a transcription."}
-    ],
+    "segments": [{"start": 0.0, "end": 2.5, "text": "This is a transcription."}],
 }
 TRANSCRIBED_TXT_RESPONSE = "This is a transcription."
 TRANSCRIBED_VTT_RESPONSE = """WEBVTT
@@ -73,9 +71,7 @@ async def test_get_answer_attachment_preserves_an_existing_files_mode(
 ) -> None:
     """get_answer_attachment() preserves the mode of an existing file."""
     url = f"{TEST_BASE_URL}/form/submission/attachment/123"
-    respx_mock.get(url).mock(
-        return_value=httpx.Response(200, content=ATTACHMENT_CONTENT)
-    )
+    respx_mock.get(url).mock(return_value=httpx.Response(200, content=ATTACHMENT_CONTENT))
 
     output_file = tmp_path / "existing.mp3"
     output_file.write_bytes(b"old content")
@@ -92,9 +88,7 @@ async def test_get_answer_attachment_expands_a_tilde_path(
 ) -> None:
     """get_answer_attachment() expands ~ to the home directory."""
     url = f"{TEST_BASE_URL}/form/submission/attachment/123"
-    respx_mock.get(url).mock(
-        return_value=httpx.Response(200, content=ATTACHMENT_CONTENT)
-    )
+    respx_mock.get(url).mock(return_value=httpx.Response(200, content=ATTACHMENT_CONTENT))
 
     monkeypatch.setenv("HOME", str(tmp_path))
 
@@ -227,15 +221,15 @@ async def test_get_attachment_transcription_selects_the_route_by_format(
     respx_mock: respx.MockRouter,
 ) -> None:
     """get_attachment_transcription() selects the correct route based on format."""
-    json_route = respx_mock.get(
-        f"{TEST_BASE_URL}/submission/attachment/123/transcribed/json"
-    ).mock(return_value=httpx.Response(200, json=TRANSCRIBED_JSON_RESPONSE))
-    txt_route = respx_mock.get(
-        f"{TEST_BASE_URL}/submission/attachment/123/transcribed/txt"
-    ).mock(return_value=httpx.Response(200, text=TRANSCRIBED_TXT_RESPONSE))
-    vtt_route = respx_mock.get(
-        f"{TEST_BASE_URL}/submission/attachment/123/transcribed/vtt"
-    ).mock(return_value=httpx.Response(200, text=TRANSCRIBED_VTT_RESPONSE))
+    json_route = respx_mock.get(f"{TEST_BASE_URL}/submission/attachment/123/transcribed/json").mock(
+        return_value=httpx.Response(200, json=TRANSCRIBED_JSON_RESPONSE)
+    )
+    txt_route = respx_mock.get(f"{TEST_BASE_URL}/submission/attachment/123/transcribed/txt").mock(
+        return_value=httpx.Response(200, text=TRANSCRIBED_TXT_RESPONSE)
+    )
+    vtt_route = respx_mock.get(f"{TEST_BASE_URL}/submission/attachment/123/transcribed/vtt").mock(
+        return_value=httpx.Response(200, text=TRANSCRIBED_VTT_RESPONSE)
+    )
 
     # Test JSON format
     result_json = await get_attachment_transcription(123, format="json")
@@ -441,9 +435,7 @@ async def test_upload_returns_200_response_body(
 ) -> None:
     """upload_submission_attachment() returns the 200 response body verbatim."""
     url = f"{TEST_BASE_URL}/form/submission/1/attachment"
-    route = respx_mock.put(url).mock(
-        return_value=httpx.Response(200, json=UPLOAD_SUCCESS_RESPONSE)
-    )
+    route = respx_mock.put(url).mock(return_value=httpx.Response(200, json=UPLOAD_SUCCESS_RESPONSE))
 
     test_file = tmp_path / "upload.mp3"
     test_file.write_bytes(ATTACHMENT_CONTENT)

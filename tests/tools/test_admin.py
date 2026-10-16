@@ -273,7 +273,9 @@ async def test_get_image_temp_file_has_mode_0600(respx_mock: respx.MockRouter) -
     path.unlink()
 
 
-async def test_get_image_accepts_non_numeric_id(respx_mock: respx.MockRouter, tmp_path: Path) -> None:
+async def test_get_image_accepts_non_numeric_id(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
     """get_image() accepts non-numeric IDs (the spec types it as string, not int)."""
     # Use an ID that would fail if coerced to int
     image_id = "a/b"

@@ -32,9 +32,7 @@ RETRANSCRIBE = Route("POST", "/submission/attachment/{answerAttachmentId}/retran
 
 @tool()
 @endpoint(ANSWER_ATTACHMENT)
-async def get_answer_attachment(
-    answer_attachment_id: int, output_path: str | None = None
-) -> str:
+async def get_answer_attachment(answer_attachment_id: int, output_path: str | None = None) -> str:
     """
     Download an answer attachment to a file, written to disk.
 
@@ -128,8 +126,7 @@ async def upload_submission_attachment(
     path = Path(file_path).expanduser().resolve()
     if not path.exists():
         raise NotFoundError(
-            f"Cannot upload {file_path!r}: the file does not exist. "
-            "Check the path and try again."
+            f"Cannot upload {file_path!r}: the file does not exist. Check the path and try again."
         )
     if not path.is_file():
         raise NotFoundError(

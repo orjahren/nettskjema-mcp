@@ -54,8 +54,34 @@ def _sanitize_schema_for_python_re(schema: dict[str, Any]) -> None:
     walk(schema)
 
 
+def _natural_sort_key(json_path: str) -> list[int | str]:
+    """
+    Convert a JSON path to a natural sort key.
+
+    Array indices like $[0], $[1], $[10] are sorted numerically, not lexicographically.
+    This ensures errors appear in index order: $[0], $[1], ..., $[10], not $[0], $[1], $[10], $[100], ...
+
+    Args:
+        json_path: A JSON path string like "$[0].elementType" or "/respondentGroup"
+
+    Returns:
+        A list of comparable segments where numeric segments are ints, others are strings.
+    """
+    segments: list[int | str] = []
+    # Split on common delimiters: /, [, ], .
+    for part in re.split(r"[/\[\].]", json_path):
+        if not part:
+            continue
+        # Try to parse as int
+        try:
+            segments.append(int(part))
+        except ValueError:
+            segments.append(part)
+    return segments
+
+
 @lru_cache(maxsize=1)
-def _build_registry() -> Registry[Any]:
+def _build_base_registry() -> tuple[Registry[Any], dict[str, Any]]:
     """
     Build a referencing registry from the vendored OpenAPI spec.
 
@@ -64,7 +90,7 @@ def _build_registry() -> Registry[Any]:
     ElementDTO.subElements.
 
     Returns:
-        A referencing Registry for jsonschema validation.
+        A tuple of (registry, sanitized_spec) for jsonschema validation.
     """
     spec = load_spec()
 
@@ -84,7 +110,85 @@ def _build_registry() -> Registry[Any]:
 
     # Build registry with the full spec anchored at base_uri
     registry: Registry[Any] = Registry().with_resource(uri=base_uri, resource=resource)
-    return registry
+    return registry, spec_copy
+
+
+@lru_cache(maxsize=128)
+def _get_schema_and_registry(
+    schema_name: str, partial: bool, as_array: bool
+) -> tuple[dict[str, Any], Registry[Any]]:
+    """
+    Get a schema and registry for validation.
+
+    Schemas are cached per (schema_name, partial, as_array) to avoid rebuilding
+    them on every validation call. The returned schema dict is immutable (read-only)
+    and must not be modified by callers.
+
+    When partial=True, a modified schema with the top-level 'required' field removed
+    is created and registered in a temporary document in the registry, so nested
+    $refs still resolve correctly.
+
+    Args:
+        schema_name: The schema name in components/schemas.
+        partial: If True, remove the top-level required constraint.
+        as_array: If True, wrap the schema in an array.
+
+    Returns:
+        A tuple of (schema_dict, registry) ready for validation.
+
+    Raises:
+        ValueError: If schema_name does not exist in the spec.
+    """
+    registry, spec = _build_base_registry()
+    schemas = spec.get("components", {}).get("schemas", {})
+
+    if schema_name not in schemas:
+        raise ValueError(
+            f"Schema '{schema_name}' not found in OpenAPI spec. "
+            f"Available schemas: {', '.join(sorted(schemas.keys()))}"
+        )
+
+    base_uri = "https://nettskjema.no/openapi.json"
+
+    if partial:
+        # For partial validation, create a modified schema without 'required'.
+        # Wrap it in a temporary OpenAPI-like document and register it so
+        # nested $refs resolve correctly.
+        partial_schema = copy.deepcopy(schemas[schema_name])
+        if "required" in partial_schema:
+            del partial_schema["required"]
+
+        # Create a temporary document with the partial schema
+        temp_doc = {
+            "components": {"schemas": {f"{schema_name}_Partial": partial_schema}},
+            # Include all other schemas so nested $refs resolve
+            **spec,
+        }
+        temp_doc["components"]["schemas"] = {
+            **spec.get("components", {}).get("schemas", {}),
+            f"{schema_name}_Partial": partial_schema,
+        }
+
+        # Register the temporary document
+        temp_uri = f"https://nettskjema.no/partial-{schema_name}.json"
+        temp_resource = Resource.from_contents(temp_doc, default_specification=DRAFT202012)
+        registry = registry.with_resource(uri=temp_uri, resource=temp_resource)
+
+        # Reference the partial schema in the temporary document
+        ref = f"{temp_uri}#/components/schemas/{schema_name}_Partial"
+        if as_array:
+            schema = {"type": "array", "items": {"$ref": ref}}
+        else:
+            schema = {"$ref": ref}
+    else:
+        # Use a $ref to the schema in the base registry
+        ref = f"{base_uri}#/components/schemas/{schema_name}"
+        if as_array:
+            schema = {"type": "array", "items": {"$ref": ref}}
+        else:
+            schema = {"$ref": ref}
+
+    return schema, registry
 
 
 def validate_body(
@@ -104,6 +208,9 @@ def validate_body(
     behavior — partial updates target specific top-level fields, and any nested
     object that is supplied is replaced whole.
 
+    The prepared schema is cached per (schema_name, partial, as_array) to avoid
+    rebuilding it on every call. The cache is read-only and immutable.
+
     Args:
         schema_name: The schema name in components/schemas (e.g., "FormSettingsDTO").
         body: The request body to validate.
@@ -114,46 +221,7 @@ def validate_body(
         ValueError: If schema_name does not exist in the spec.
         BadRequestError: If validation fails.
     """
-    spec = load_spec()
-    schemas = spec.get("components", {}).get("schemas", {})
-
-    if schema_name not in schemas:
-        raise ValueError(
-            f"Schema '{schema_name}' not found in OpenAPI spec. "
-            f"Available schemas: {', '.join(sorted(schemas.keys()))}"
-        )
-
-    # Build the schema to validate against
-    # Use a $ref to the schema in the registry so nested $refs resolve correctly
-    schema: dict[str, Any] = {
-        "$ref": f"https://nettskjema.no/openapi.json#/components/schemas/{schema_name}"
-    }
-
-    if partial:
-        # For partial validation, we need to modify the schema to remove required.
-        # We can't use a $ref here, so we copy the schema and modify it.
-        schema_def = copy.deepcopy(schemas[schema_name])
-        _sanitize_schema_for_python_re(schema_def)
-        if "required" in schema_def:
-            del schema_def["required"]
-        schema = schema_def
-
-    if as_array:
-        # Wrap in array schema
-        if partial:
-            # We already have the unwrapped schema
-            schema = {"type": "array", "items": schema}
-        else:
-            # Use a ref for the items
-            schema = {
-                "type": "array",
-                "items": {
-                    "$ref": f"https://nettskjema.no/openapi.json#/components/schemas/{schema_name}"
-                },
-            }
-
-    # Build the registry and validate
-    registry = _build_registry()
+    schema, registry = _get_schema_and_registry(schema_name, partial, as_array)
     validator = jsonschema.Draft202012Validator(schema, registry=registry)
 
     # Collect all validation errors, not just the first
@@ -162,10 +230,10 @@ def validate_body(
     if not errors:
         return
 
-    # Map each JSON pointer to its error messages, sorted deterministically
+    # Map each JSON pointer to its error messages, sorted naturally (numeric indices as ints)
     field_errors: dict[str, list[str]] = {}
-    for error in sorted(errors, key=lambda e: e.json_path):
-        # The JSON path is the field location (e.g., "/respondentGroup" or "/0/elementType")
+    for error in sorted(errors, key=lambda e: _natural_sort_key(e.json_path)):
+        # The JSON path is the field location (e.g., "/respondentGroup" or "$[0].elementType")
         path = error.json_path or "/"
 
         # Build a clear error message depending on the validation failure

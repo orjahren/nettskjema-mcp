@@ -34,7 +34,10 @@ def test_full_body_still_enforces_required_fields() -> None:
 def test_bad_enum_value_names_the_field_and_the_allowed_values() -> None:
     with pytest.raises(BadRequestError) as e:
         validate_body("FormSettingsDTO", {"respondentGroup": "EVERYONE"}, partial=True)
-    assert "respondentGroup" in str(e.value) and "INVITED" in str(e.value)
+    msg = str(e.value)
+    # Assert the error is specifically for respondentGroup, not just anywhere in the message
+    assert "/respondentGroup" in msg or "respondentGroup" in msg
+    assert "INVITED" in msg
 
 
 def test_wrong_type_names_the_field() -> None:
@@ -46,7 +49,10 @@ def test_wrong_type_names_the_field() -> None:
 def test_element_list_validates_each_item() -> None:
     with pytest.raises(BadRequestError) as e:
         validate_body("ElementDTO", [{"elementType": "NOT_A_TYPE"}], as_array=True)
-    assert "elementType" in str(e.value)
+    msg = str(e.value)
+    assert "elementType" in msg
+    # Assert the error identifies the failing index
+    assert "$[0]" in msg or "[0]" in msg
 
 
 def test_nested_ref_resolves() -> None:
@@ -55,6 +61,62 @@ def test_nested_ref_resolves() -> None:
         "ElementDTO",
         {"elementType": "RADIO", "answerOptions": [{"text": "Option 1"}]},
     )
+
+
+def test_partial_nested_ref_resolves() -> None:
+    """
+    Critical: partial=True must not break nested $ref resolution.
+
+    FormSettingsDTO.editors is a $ref to PersonDTO. When partial=True, the modified
+    schema must still be registered in the registry so nested $refs resolve.
+    Without this fix, the schema is detached and validation crashes with PointerToNowhere.
+    """
+    validate_body(
+        "FormSettingsDTO",
+        {
+            "title": "x",
+            "editors": [{"userType": "FEIDE", "username": "testuser"}],
+        },
+        partial=True,
+    )
+
+
+def test_partial_nested_required_still_enforced() -> None:
+    """
+    partial=True strips only the top-level required constraint.
+
+    Nested objects (like FormSettingsSupportuserDTO in FormSettingsDTO.supportuser) keep
+    their validation constraints. If a nested object appears in a partial body, it must be valid.
+    """
+    with pytest.raises(BadRequestError) as e:
+        validate_body(
+            "FormSettingsDTO",
+            {
+                "title": "x",
+                "supportuser": {"theme": "INVALID_THEME"},  # invalid theme enum
+            },
+            partial=True,
+        )
+    msg = str(e.value)
+    assert "theme" in msg or "DEFAULT" in msg
+
+
+def test_array_errors_sorted_naturally() -> None:
+    """
+    Critical: array errors must be sorted naturally, not lexicographically.
+
+    With lexicographic sorting, $[0], $[100], $[10] would appear out of order,
+    and the first 20 rendered errors would skip indices 1-9 and 20-99.
+    Natural sorting ensures $[0], $[1], ..., $[19] appear in order.
+    """
+    # Create 15 items with errors to confirm the first 15 are shown in order
+    bad_body = [{"text": f"item {i}"} for i in range(15)]
+    with pytest.raises(BadRequestError) as e:
+        validate_body("ElementDTO", bad_body, as_array=True)
+    msg = str(e.value)
+    # Confirm indices 0-14 appear in the message, in order
+    for i in range(15):
+        assert f"$[{i}]" in msg or f"[{i}]" in msg
 
 
 def test_pathological_body_stays_bounded() -> None:

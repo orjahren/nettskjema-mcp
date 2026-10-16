@@ -17,6 +17,7 @@ from tests.tools.test_forms_read import (
     PERSONAL_DATA_FORMS,
 )
 from tests.tools.test_submissions_read import MY_SUBMISSIONS, SUBMISSION
+from tests.tools.test_submissions_write import DELIVERED_SUBMISSION
 
 # Registry of all response fixtures with their routes
 # Format: (method, path, fixture, fixture_name)
@@ -30,6 +31,13 @@ ALL_FIXTURES = [
     ("GET", "/personal-data/collects-personal-data", PERSONAL_DATA_FORMS, "PERSONAL_DATA_FORMS"),
     ("GET", "/form/submission/{submissionId}", SUBMISSION, "SUBMISSION"),
     ("GET", "/form/submission/me", MY_SUBMISSIONS, "MY_SUBMISSIONS"),
+    ("POST", "/form/{formId}/submission", DELIVERED_SUBMISSION, "DELIVERED_SUBMISSION"),
+    (
+        "POST",
+        "/form/invitation/{invitationId}/submission",
+        DELIVERED_SUBMISSION,
+        "DELIVERED_SUBMISSION",
+    ),
 ]
 
 
@@ -54,12 +62,16 @@ def test_all_response_fixtures_validate() -> None:
 
 
 def test_fixture_count_matches_expected() -> None:
-    """Enforce that exactly 9 fixtures are validated (Tasks 7-10).
+    """Enforce that exactly 11 fixtures are validated (Tasks 7-11).
 
     This test fails if the fixture count changes, forcing an update to either
     add the new fixture to ALL_FIXTURES or document why it's exempt.
+
+    Task 11 added two: both deliver operations, which share one fixture because
+    the spec gives them the same (untyped object) 200 schema. Its deletes have
+    no response body in the spec, so they have no fixture to validate.
     """
-    expected_count = 9
+    expected_count = 11
     actual_count = len(ALL_FIXTURES)
     assert actual_count == expected_count, (
         f"Expected {expected_count} response fixtures from Tasks 7-10, found {actual_count}. "

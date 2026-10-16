@@ -1,8 +1,22 @@
 """Import smoke tests to catch import cycles and basic breakage."""
 
+import importlib
+import pkgutil
 
-def test_all_modules_import_without_error() -> None:
-    """Verify all nettskjema_mcp modules can be imported."""
-    # Import all modules that should exist
-    import nettskjema_mcp.config  # noqa: F401
-    import nettskjema_mcp.errors  # noqa: F401
+import pytest
+
+import nettskjema_mcp
+
+
+def _discover_modules() -> list[str]:
+    """Discover all importable modules under nettskjema_mcp."""
+    modules = []
+    for module_info in pkgutil.walk_packages(nettskjema_mcp.__path__, prefix="nettskjema_mcp."):
+        modules.append(module_info.name)
+    return modules
+
+
+@pytest.mark.parametrize("module_name", _discover_modules())
+def test_module_imports_without_error(module_name: str) -> None:
+    """Verify each nettskjema_mcp module can be imported."""
+    importlib.import_module(module_name)

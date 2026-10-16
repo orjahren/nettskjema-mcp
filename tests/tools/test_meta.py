@@ -251,7 +251,9 @@ async def test_read_only_tools_are_exactly_the_get_only_tools() -> None:
             assert gets_only, (
                 f"{registered.name} is annotated readOnlyHint but calls "
                 f"{sorted({route.method for route in routes})}; clients auto-approve "
-                "read-only tools, so drop the annotation"
+                "read-only tools, so drop the annotation if the tool changes anything. "
+                "If it genuinely only reads and the API simply requires a non-GET verb, "
+                "exempt it here deliberately rather than dropping the hint"
             )
         else:
             assert not gets_only, (

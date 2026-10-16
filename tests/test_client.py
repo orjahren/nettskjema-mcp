@@ -559,6 +559,52 @@ async def test_aclose_client_is_safe_without_a_cached_client() -> None:
     await aclose_client()
 
 
+async def test_json_rejects_body_and_content_together(client: NettskjemaClient) -> None:
+    """json raises BadRequestError when both body and content are provided."""
+    with pytest.raises(BadRequestError) as excinfo:
+        await client.json(
+            FORM_INFO,
+            path={"formId": 1},
+            body={"some": "json"},
+            content=b"raw bytes",
+        )
+
+    assert "body and content are mutually exclusive" in str(excinfo.value)
+
+
+async def test_json_merges_headers_without_dropping_authorization(
+    client: NettskjemaClient, respx_mock: respx.MockRouter
+) -> None:
+    """json merges extra_headers on top of defaults without replacing Authorization."""
+    route = respx_mock.get(f"{BASE_URL}/form/1/info").mock(
+        return_value=httpx.Response(200, json={"formId": 1})
+    )
+
+    await client.json(
+        FORM_INFO,
+        path={"formId": 1},
+        headers={"X-Custom-Header": "test-value"},
+    )
+
+    assert route.call_count == 1
+    request = route.calls.last.request
+    assert request.headers["Authorization"] == "Bearer test-token"
+    assert request.headers["X-Custom-Header"] == "test-value"
+    assert request.headers["Accept"] == "application/json"
+
+
+async def test_json_rejects_authorization_replacement(client: NettskjemaClient) -> None:
+    """json raises BadRequestError when headers tries to replace Authorization."""
+    with pytest.raises(BadRequestError) as excinfo:
+        await client.json(
+            FORM_INFO,
+            path={"formId": 1},
+            headers={"Authorization": "Bearer fake-token"},
+        )
+
+    assert "Cannot replace the Authorization header" in str(excinfo.value)
+
+
 def test_dump_renders_readable_json() -> None:
     """dump pretty-prints with real Unicode characters, not escapes."""
     rendered = dump({"title": "Spørreskjema", "ids": [1, 2]})

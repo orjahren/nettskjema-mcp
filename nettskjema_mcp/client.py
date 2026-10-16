@@ -172,6 +172,8 @@ class NettskjemaClient:
         path: dict[str, object] | None = None,
         query: dict[str, object] | None = None,
         body: object | None = None,
+        content: bytes | None = None,
+        headers: dict[str, str] | None = None,
     ) -> object:
         """
         Call a JSON endpoint and return the decoded body.
@@ -181,17 +183,28 @@ class NettskjemaClient:
             path: Values for the route's path placeholders.
             query: Query parameters; entries whose value is None are dropped.
             body: Request body. Sent as-is, so a list becomes a bare JSON array.
+            content: Raw request body as bytes. Mutually exclusive with body.
+            headers: Additional headers to merge on top of the defaults
+                (Authorization and Accept). May not replace Authorization.
 
         Returns:
             The decoded JSON body, or a no-content marker when the body was empty.
 
         Raises:
+            BadRequestError: If both body and content are provided.
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
             PartialSuccessError: For a clean 2xx from a route in
                 ERROR_BODY_ROUTES whose body reports the change was rejected.
             UpstreamError: If a successful response carried a body that is not JSON.
         """
-        request = await self._build_request(route, path, query, json_body=body)
+        if body is not None and content is not None:
+            raise BadRequestError(
+                "body and content are mutually exclusive; provide only one. "
+                "Use body for JSON payloads, content for raw bytes."
+            )
+        request = await self._build_request(
+            route, path, query, json_body=body, content=content, extra_headers=headers
+        )
         response = await self._send(request)
         payload = _decode_body(response)
         self._check_status(route, response, payload)
@@ -474,6 +487,7 @@ class NettskjemaClient:
         json_body: object | None = None,
         content: bytes | None = None,
         accept: str = "application/json",
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Request:
         """Build an authenticated request for a route."""
         url = self._url(route, path)
@@ -484,6 +498,14 @@ class NettskjemaClient:
         except httpx.RequestError as exc:
             raise self._transport_error(exc) from exc
         headers = {"Authorization": f"Bearer {token}", "Accept": accept}
+        if extra_headers is not None:
+            for name, value in extra_headers.items():
+                if name == "Authorization":
+                    raise BadRequestError(
+                        "Cannot replace the Authorization header through extra_headers. "
+                        "The header is set automatically from the OAuth2 token."
+                    )
+                headers[name] = value
         params = _query_params(query)
         return self._client().build_request(
             route.method,

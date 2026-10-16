@@ -49,12 +49,13 @@ async def get_submission_pdf(submission_id: int, output_path: str | None = None)
 
     The PDF is written to disk, not returned inline: a multi-megabyte PDF as
     base64 is not useful to a model. The returned path is absolute and
-    tilde-expanded. An existing file at the output path is silently overwritten.
+    tilde-expanded. An existing file at the output path is silently overwritten,
+    and its mode is preserved. A new file (whether from output_path or a temp file)
+    is created with mode 0600 (readable only by the current user).
 
     When output_path is omitted, a temporary file is created in the system temp
-    directory with a .pdf suffix and mode 0600 (readable only by the current user).
-    The temporary file persists after this call returns and is left on disk for the
-    caller to use or delete.
+    directory with a .pdf suffix. The temporary file persists after this call
+    returns and is left on disk for the caller to use or delete.
 
     Args:
         submission_id: The submission's numeric ID.

@@ -362,6 +362,8 @@ class NettskjemaClient:
         # The file to clean up if the download does not complete. Set only once
         # the file is ours: a failure before that must not delete an existing file.
         partial: Path | None = None
+        # Track if file existed before we wrote to it (to preserve user's mode)
+        file_existed = target is not None and target.exists()
         try:
             await self._check_streamed_status(route, response)
             media_type = _media_type(response)
@@ -374,6 +376,10 @@ class NettskjemaClient:
                     handle.write(chunk)
                     written += len(chunk)
             partial = None
+            # Chmod to 0600 for new files (temp or caller-supplied)
+            # If file already existed, preserve the user's mode
+            if not file_existed:
+                target.chmod(0o600)
         except BaseException as exc:
             # A half-written export must not be left behind looking complete.
             _discard_partial(partial)

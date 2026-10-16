@@ -22,6 +22,7 @@ def settings() -> Settings:
         timeout=30.0,
         log_level="INFO",
         max_answer_rows=1000,
+        max_text_chars=1000000,
     )
 
 
@@ -36,6 +37,7 @@ def settings_no_creds() -> Settings:
         timeout=30.0,
         log_level="INFO",
         max_answer_rows=1000,
+        max_text_chars=1000000,
     )
 
 

@@ -215,17 +215,30 @@ class NettskjemaClient:
         *,
         path: dict[str, object] | None = None,
         query: dict[str, object] | None = None,
-    ) -> str:
+        max_chars: int | None = None,
+    ) -> dict[str, object] | str:
         """
-        Call an endpoint and return its body as text, unchanged.
+        Call an endpoint and return its body as text.
+
+        When max_chars is provided, returns an envelope with the text, a truncated
+        flag, total character count, and the truncation reason. Text is cut at the
+        last complete newline before the limit, so CSV and similar formats never
+        break mid-row. When max_chars is None, returns the raw text verbatim for
+        backward compatibility.
 
         Args:
             route: The route to call.
             path: Values for the route's path placeholders.
             query: Query parameters; entries whose value is None are dropped.
+            max_chars: Maximum characters to return. When None, no limit is applied
+                and the raw text is returned. When provided, the envelope is returned
+                instead.
 
         Returns:
-            The response body verbatim, including surrounding whitespace.
+            When max_chars is None: the response body as a plain string, verbatim.
+            When max_chars is provided: a dict with text (the response body, possibly
+            truncated at the last newline), truncated (boolean), reason (string or
+            None), and totalChars (the full size before truncation).
 
         Raises:
             NettskjemaError: For HTTP 207 and for any status outside 2xx.
@@ -236,7 +249,37 @@ class NettskjemaClient:
             # Decoding is only worth its cost on the error path: these bodies are
             # large (an SPSS syntax export is plain text by design, not JSON).
             self._check_status(route, response, _decode_body(response))
-        return response.text
+
+        full_text = response.text
+
+        # Backward compatibility: if max_chars is None, return raw text
+        if max_chars is None:
+            return full_text
+
+        # Envelope mode: return with metadata
+        total_chars = len(full_text)
+        truncated = total_chars > max_chars
+        reason: str | None = None
+        text = full_text
+
+        if truncated:
+            # Cut at the last complete newline before the limit
+            cut_at = full_text.rfind("\n", 0, max_chars)
+            if cut_at == -1:
+                # No newline found; cut at the character limit
+                text = full_text[:max_chars]
+                reason = "charCap"
+            else:
+                # Include the newline itself
+                text = full_text[: cut_at + 1]
+                reason = "charCap"
+
+        return {
+            "text": text,
+            "truncated": truncated,
+            "reason": reason,
+            "totalChars": total_chars,
+        }
 
     async def ndjson(
         self,

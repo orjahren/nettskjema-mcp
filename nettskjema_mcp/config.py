@@ -15,6 +15,7 @@ class Settings:
     timeout: float
     log_level: str
     max_answer_rows: int
+    max_text_chars: int
 
 
 _settings_cache: Settings | None = None
@@ -42,6 +43,7 @@ def get_settings() -> Settings:
             timeout=float(os.getenv("NETTSKJEMA_TIMEOUT", "30.0")),
             log_level=os.getenv("NETTSKJEMA_LOG_LEVEL", "INFO"),
             max_answer_rows=int(os.getenv("NETTSKJEMA_MAX_ANSWER_ROWS", "1000")),
+            max_text_chars=int(os.getenv("NETTSKJEMA_MAX_TEXT_CHARS", "1000000")),
         )
     return _settings_cache
 

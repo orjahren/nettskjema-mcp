@@ -294,6 +294,11 @@ def validate_body(
                 if matches:
                     suggestions = ", ".join(repr(m) for m in matches)
                     message += f"; did you mean {suggestions}?"
+        elif error.validator in ("pattern", "maxLength", "minLength"):
+            # These validators embed the failing instance in their default message.
+            # Build the message from the keyword and path only, to avoid leaking
+            # credential values when a token field later gains such a constraint.
+            message = f"failed the {error.validator} constraint"
         else:
             message = error.message
 

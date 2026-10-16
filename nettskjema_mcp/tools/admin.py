@@ -4,10 +4,15 @@ The TSD and Educloud activation tokens are credentials, exactly like the OAuth
 access token and the attachment token: never in a log record at any level, never
 in an exception message, never in a returned dict.
 
+Image uploads read the entire file into memory, base64-encode it (adding roughly a
+third again on top of the file size), and httpx then serialises the result — several
+times the file size resident at peak, with no cap.
+
 The POST /image endpoint declares its body as {"type": "string", "format": "byte"}
-under application/json — a JSON string holding base64. This module implements what
-the published schema says. The actual server may expect raw bytes instead; if it
-rejects the base64 string, the e2e list tracks investigating that discrepancy.
+under application/json — a JSON string holding base64. This module sends the file
+as a base64-encoded JSON string, per the published schema. The actual server may
+expect raw bytes instead; whether it accepts the JSON string or rejects it with a
+decode error is an open question that can only be settled end-to-end.
 """
 
 import base64
@@ -97,25 +102,24 @@ async def activate_educloud(form_id: int, project_name: str, token: str) -> str:
 @endpoint(UPLOAD_IMAGE)
 async def upload_image(file_path: str) -> str:
     """
-    Upload an image to the API, returning the image ID and URL.
+    Upload an image to the API, returning a response with string keys and values.
 
     The entire file is read into memory, base64-encoded, and sent as a JSON string
     in the request body, per the published OpenAPI schema ({"type": "string",
     "format": "byte"} under application/json). The filename is derived from the
     file itself and sent as a query parameter.
 
-    The spec declares the body format as a Spring serialization artifact; the
-    actual server may expect raw bytes. If the upload fails with a decode error,
-    that discrepancy is tracked in the e2e list.
+    The body format is most likely a Spring Boot serialisation artefact where a
+    byte[] parameter was rendered as format: byte. The actual server may expect
+    raw bytes; whether it accepts the JSON string can only be settled end-to-end.
 
     Args:
         file_path: Path to the image file to upload. May be relative or contain ~.
 
     Returns:
         A JSON object with string keys and string values (the spec declares
-        {"type": "object", "additionalProperties": {"type": "string"}}). The
-        response typically includes an imageId and may include a URL or other
-        metadata.
+        {"type": "object", "additionalProperties": {"type": "string"}} and names
+        no specific properties).
     """
     # Expand and resolve the path, then check the file exists
     path = Path(file_path).expanduser().resolve()

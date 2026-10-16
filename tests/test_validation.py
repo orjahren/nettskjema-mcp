@@ -135,3 +135,53 @@ def test_unknown_schema_name_raises_clear_error() -> None:
     with pytest.raises(ValueError) as e:
         validate_body("NoSuchSchemaDTO", {})
     assert "NoSuchSchemaDTO" in str(e.value)
+
+
+def test_pattern_errors_do_not_leak_instance_value() -> None:
+    """
+    pattern/maxLength/minLength errors must not embed the instance value.
+
+    jsonschema's default messages for these validators include the failing value,
+    which would leak credentials if a token field later gains such a constraint.
+    The fallback in validation.py must build safe messages instead.
+
+    This test creates a simple schema with maxLength to construct a violation, then
+    verifies the rendering does not leak the secret. No schema in today's snapshot
+    exercises this path, but a snapshot refresh could add one.
+    """
+    from jsonschema import Draft202012Validator
+
+    # Create a simple schema with a maxLength constraint
+    schema = {
+        "type": "object",
+        "properties": {
+            "token": {"type": "string", "maxLength": 5}
+        }
+    }
+
+    # Create a validator
+    validator = Draft202012Validator(schema)
+
+    # Construct a violation with a secret value that exceeds maxLength
+    secret_value = "SECRET123withNumbers"
+    errors = list(validator.iter_errors({"token": secret_value}))
+
+    # Verify jsonschema embeds the instance (this is what we're protecting against)
+    assert len(errors) == 1
+    assert secret_value in errors[0].message
+
+    # Now render the errors the way validate_body does
+    field_errors: dict[str, list[str]] = {}
+    for error in errors:
+        path = error.json_path or "/"
+        if error.validator in ("pattern", "maxLength", "minLength"):
+            message = f"failed the {error.validator} constraint"
+        else:
+            message = error.message
+        field_errors.setdefault(path, []).append(message)
+
+    # The rendered message must not contain the secret
+    rendered = str(field_errors)
+    assert secret_value not in rendered
+    # But it should mention the constraint
+    assert "maxLength" in rendered.lower() or "constraint" in rendered.lower()

@@ -1,6 +1,7 @@
 """Tests for admin tools: TSD/Educloud activation and image upload/download."""
 
 import base64
+import inspect
 import json
 import logging
 from pathlib import Path
@@ -48,10 +49,15 @@ async def test_activate_tsd_sends_body(respx_mock: respx.MockRouter) -> None:
     assert body["token"] == "test-token"
 
 
-async def test_activate_tsd_returns_success_marker_on_200() -> None:
+async def test_activate_tsd_returns_success_marker_on_200(respx_mock: respx.MockRouter) -> None:
     """activate_tsd() returns a success marker when the API returns 200 with no body."""
-    # Will be tested once implementation exists
-    pass
+    url = f"{TEST_BASE_URL}/form/123/activate/tsd"
+    respx_mock.post(url).mock(return_value=httpx.Response(200))
+
+    result = await activate_tsd(form_id=123, project_name="proj", token="tok")
+
+    parsed = json.loads(result)
+    assert parsed == {"status": "success", "httpStatus": 200}
 
 
 async def test_activate_educloud_sends_body(respx_mock: respx.MockRouter) -> None:
@@ -68,10 +74,17 @@ async def test_activate_educloud_sends_body(respx_mock: respx.MockRouter) -> Non
     assert body["token"] == "edu-token"
 
 
-async def test_activate_educloud_returns_success_marker_on_200() -> None:
+async def test_activate_educloud_returns_success_marker_on_200(
+    respx_mock: respx.MockRouter,
+) -> None:
     """activate_educloud() returns a success marker when the API returns 200 with no body."""
-    # Will be tested once implementation exists
-    pass
+    url = f"{TEST_BASE_URL}/form/456/activate/educloud"
+    respx_mock.post(url).mock(return_value=httpx.Response(200))
+
+    result = await activate_educloud(form_id=456, project_name="proj", token="tok")
+
+    parsed = json.loads(result)
+    assert parsed == {"status": "success", "httpStatus": 200}
 
 
 async def test_upload_image_sends_base64_body(respx_mock: respx.MockRouter, tmp_path: Path) -> None:
@@ -231,11 +244,47 @@ async def test_get_image_creates_temp_file_when_no_output_path(
     path.unlink()
 
 
-async def test_get_image_is_in_file_writers() -> None:
-    """get_image() must be exempted from readOnlyHint enforcement."""
-    # This is verified by tests/tools/test_meta.py's FILE_WRITERS set
-    # Just document the expectation here
-    pass
+async def test_get_image_new_file_has_mode_0600(
+    respx_mock: respx.MockRouter, tmp_path: Path
+) -> None:
+    """get_image() creates new files with mode 0600."""
+    url = f"{TEST_BASE_URL}/image/test-id"
+    respx_mock.get(url).mock(return_value=httpx.Response(200, content=IMAGE_CONTENT))
+
+    output_file = tmp_path / "new-image.png"
+    await get_image(image_id="test-id", output_path=str(output_file))
+
+    # New file should have mode 0600
+    assert (output_file.stat().st_mode & 0o777) == 0o600
+
+
+async def test_get_image_temp_file_has_mode_0600(respx_mock: respx.MockRouter) -> None:
+    """get_image() creates temp files with mode 0600."""
+    url = f"{TEST_BASE_URL}/image/test-id"
+    respx_mock.get(url).mock(return_value=httpx.Response(200, content=IMAGE_CONTENT))
+
+    result = await get_image(image_id="test-id")
+
+    parsed = json.loads(result)
+    path = Path(parsed["path"])
+    # Temp file should have mode 0600
+    assert (path.stat().st_mode & 0o777) == 0o600
+    # Clean up
+    path.unlink()
+
+
+async def test_get_image_accepts_non_numeric_id(respx_mock: respx.MockRouter, tmp_path: Path) -> None:
+    """get_image() accepts non-numeric IDs (the spec types it as string, not int)."""
+    # Use an ID that would fail if coerced to int
+    image_id = "a/b"
+    url = f"{TEST_BASE_URL}/image/a%2Fb"  # URL-encoded
+    route = respx_mock.get(url).mock(return_value=httpx.Response(200, content=IMAGE_CONTENT))
+
+    output_file = tmp_path / "image.png"
+    await get_image(image_id=image_id, output_path=str(output_file))
+
+    assert route.call_count == 1
+    assert output_file.exists()
 
 
 async def test_tokens_are_not_logged(
@@ -291,6 +340,25 @@ async def test_tokens_not_in_error_messages(respx_mock: respx.MockRouter) -> Non
     assert "secret-edu-token" not in str(excinfo.value)
 
 
+async def test_tokens_not_in_returned_dict(respx_mock: respx.MockRouter) -> None:
+    """TSD and Educloud tokens never appear in the returned tool result."""
+    tsd_url = f"{TEST_BASE_URL}/form/100/activate/tsd"
+    edu_url = f"{TEST_BASE_URL}/form/200/activate/educloud"
+
+    respx_mock.post(tsd_url).mock(return_value=httpx.Response(200))
+    respx_mock.post(edu_url).mock(return_value=httpx.Response(200))
+
+    # Test TSD activation success
+    result = await activate_tsd(form_id=100, project_name="tsd-proj", token="secret-tsd-token")
+    assert "secret-tsd-token" not in result
+    assert "tsd-proj" not in result  # project name also should not be echoed
+
+    # Test Educloud activation success
+    result = await activate_educloud(form_id=200, project_name="edu-proj", token="secret-edu-token")
+    assert "secret-edu-token" not in result
+    assert "edu-proj" not in result  # project name also should not be echoed
+
+
 async def test_activate_tsd_declares_its_route() -> None:
     """activate_tsd() must declare its route in the registry."""
     assert "activate_tsd" in REGISTRY
@@ -329,3 +397,20 @@ async def test_get_image_declares_its_route() -> None:
     route = list(routes)[0]
     assert route.method == "GET"
     assert "/image/" in route.path
+
+
+async def test_activation_parameters_are_required() -> None:
+    """project_name and token must be required Python parameters (no defaults)."""
+    tsd_sig = inspect.signature(activate_tsd)
+    assert tsd_sig.parameters["project_name"].default == inspect.Parameter.empty
+    assert tsd_sig.parameters["token"].default == inspect.Parameter.empty
+
+    edu_sig = inspect.signature(activate_educloud)
+    assert edu_sig.parameters["project_name"].default == inspect.Parameter.empty
+    assert edu_sig.parameters["token"].default == inspect.Parameter.empty
+
+
+async def test_image_id_is_str() -> None:
+    """image_id must be typed as str (the spec declares it as string, not int)."""
+    sig = inspect.signature(get_image)
+    assert sig.parameters["image_id"].annotation is str

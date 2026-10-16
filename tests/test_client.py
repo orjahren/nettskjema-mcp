@@ -617,6 +617,56 @@ async def test_json_rejects_lowercase_authorization_replacement(client: Nettskje
     assert "Cannot replace the Authorization header" in str(excinfo.value)
 
 
+async def test_json_allows_accept_override(
+    client: NettskjemaClient, respx_mock: respx.MockRouter
+) -> None:
+    """json allows Accept to be overridden, though it will break decoding."""
+    route = respx_mock.get(f"{BASE_URL}/form/1/info").mock(
+        return_value=httpx.Response(200, json={"formId": 1})
+    )
+
+    await client.json(
+        FORM_INFO,
+        path={"formId": 1},
+        headers={"Accept": "text/plain"},
+    )
+
+    assert route.call_count == 1
+    request = route.calls.last.request
+    assert request.headers["Accept"] == "text/plain"
+
+
+async def test_json_rejects_headers_with_control_characters(client: NettskjemaClient) -> None:
+    """json raises BadRequestError when a header value contains control characters."""
+    with pytest.raises(BadRequestError) as excinfo:
+        await client.json(
+            FORM_INFO,
+            path={"formId": 1},
+            headers={"X-Custom-Header": "sekret\nwith\rnewlines"},
+        )
+
+    assert "X-Custom-Header" in str(excinfo.value)
+    assert "control characters" in str(excinfo.value)
+    # The header value must not appear in the error message
+    assert "sekret" not in str(excinfo.value)
+    assert "newlines" not in str(excinfo.value)
+
+
+async def test_json_rejects_headers_with_non_latin1_characters(
+    client: NettskjemaClient,
+) -> None:
+    """json raises BadRequestError when a header value is not latin-1 encodable."""
+    with pytest.raises(BadRequestError) as excinfo:
+        await client.json(
+            FORM_INFO,
+            path={"formId": 1},
+            headers={"X-Custom-Header": "value-中文"},
+        )
+
+    assert "X-Custom-Header" in str(excinfo.value)
+    assert "latin-1" in str(excinfo.value)
+
+
 def test_dump_renders_readable_json() -> None:
     """dump pretty-prints with real Unicode characters, not escapes."""
     rendered = dump({"title": "Spørreskjema", "ids": [1, 2]})

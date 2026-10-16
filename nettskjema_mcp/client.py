@@ -509,8 +509,22 @@ class NettskjemaClient:
                     "Cannot replace the Authorization header through extra_headers. "
                     "The header is set automatically from the OAuth2 token."
                 )
-            # Merge supplied headers, which may replace Accept or add new ones
+            # Validate each header value before merging
             for name, value in extra_headers.items():
+                # HTTP/1.1 header values must be latin-1 encodable
+                try:
+                    value.encode("latin-1")
+                except UnicodeEncodeError:
+                    raise BadRequestError(
+                        f"Header {name!r} contains characters that cannot be encoded as latin-1. "
+                        "HTTP/1.1 header values must be ASCII or latin-1."
+                    ) from None
+                # Reject control characters to prevent header injection
+                if any(ord(c) < 0x20 or ord(c) == 0x7F for c in value):
+                    raise BadRequestError(
+                        f"Header {name!r} contains control characters (CR, LF, NUL, etc.) "
+                        "and cannot be used. Header values must not contain control characters."
+                    )
                 headers[name] = value
         params = _query_params(query)
         return self._client().build_request(

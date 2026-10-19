@@ -19,7 +19,7 @@ Model Context Protocol (MCP) server for the Nettskjema API v3. Provides tools to
 Clone this repository and install with pip or uv:
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:orjahren/nettskjema-mcp.git
 cd nettskjema-mcp
 pip install -e .
 ```
